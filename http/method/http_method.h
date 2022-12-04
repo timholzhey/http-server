@@ -1,0 +1,24 @@
+//
+// Created by Tim Holzhey on 03.12.22.
+//
+
+#ifndef HTTP_SERVER_HTTP_METHOD_H
+#define HTTP_SERVER_HTTP_METHOD_H
+
+typedef enum {
+	HTTP_METHOD_GET,
+	HTTP_METHOD_POST,
+	HTTP_METHOD_PUT,
+	HTTP_METHOD_DELETE,
+	HTTP_METHOD_HEAD,
+	HTTP_METHOD_OPTIONS,
+	HTTP_METHOD_TRACE,
+	HTTP_METHOD_CONNECT,
+	HTTP_METHOD_PATCH,
+	HTTP_METHOD_COUNT,
+	HTTP_METHOD_UNKNOWN,
+} http_method_t;
+
+extern const char *http_method_strings[];
+
+#endif //HTTP_SERVER_HTTP_METHOD_H
