@@ -22,7 +22,43 @@ static void http_request_handle_404(http_request_t *p_request, http_response_t *
 	p_response->status_code = HTTP_STATUS_CODE_NOT_FOUND;
 }
 
+static bool is_websocket_upgrade(http_request_t *p_request) {
+	char upgrade[HTTP_HEADER_MAX_VALUE_SIZE];
+	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Upgrade", upgrade) != RET_CODE_OK) {
+		return false;
+	}
+	if (strcmp(upgrade, "websocket") != 0) {
+		return false;
+	}
+	char connection[HTTP_HEADER_MAX_VALUE_SIZE];
+	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Connection", connection) != RET_CODE_OK) {
+		return false;
+	}
+	if (strstr(connection, "Upgrade") == NULL) {
+		return false;
+	}
+	char sec_websocket_key[HTTP_HEADER_MAX_VALUE_SIZE];
+	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Key", sec_websocket_key) != RET_CODE_OK) {
+		return false;
+	}
+	char sec_websocket_version[HTTP_HEADER_MAX_VALUE_SIZE];
+	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Version", sec_websocket_version) != RET_CODE_OK) {
+		return false;
+	}
+	if (strcmp(sec_websocket_version, "13") != 0) {
+		return false;
+	}
+	return true;
+}
+
 ret_code_t http_request_handle(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes) {
+	// check websocket upgrade
+	if (is_websocket_upgrade(p_request)) {
+		log_highlight("Websocket upgrade request");
+		websocket_handshake(p_request, p_response);
+		return RET_CODE_ERROR;
+	}
+
 	// set default content type header
 	http_headers_set_value_string(p_response->headers, &p_response->num_headers, "Content-Type", "text/html");
 

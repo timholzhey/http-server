@@ -7,7 +7,7 @@
 #include <stdbool.h>
 
 static ret_code_t read_line_crlf(const uint8_t *p_data, uint32_t data_len, uint32_t *p_line_len) {
-	for (uint32_t i = 0; i < data_len; i++) {
+	for (uint32_t i = 0; i < data_len - 1; i++) {
 		if (p_data[i] == '\r' && p_data[i + 1] == '\n') {
 			*p_line_len = i;
 			return RET_CODE_OK;
@@ -55,7 +55,7 @@ static ret_code_t read_token_delim(const uint8_t *p_data, uint32_t data_len, uin
 	line_consumed = 0;
 
 #define COPY_TOKEN(dest, max_len) \
-	if (token_length > (max_len)) { \
+	if (token_length >= (max_len)) { \
 		return RET_CODE_ERROR; \
 	} \
 	memcpy(dest, p_parse, token_length); \
@@ -124,12 +124,18 @@ ret_code_t http_request_parse(uint8_t *p_data, uint32_t data_len, http_request_t
 
 		READ_TOKEN_DELIM(':');
 
-		COPY_TOKEN(p_request->headers[p_request->num_headers].key, HTTP_PARAM_MAX_KEY_SIZE);
+		COPY_TOKEN(p_request->headers[p_request->num_headers].key, HTTP_HEADER_MAX_KEY_SIZE);
 
 		CONSUME_TOKEN();
 		READ_TOKEN_REST();
 
-		COPY_TOKEN(p_request->headers[p_request->num_headers].value, HTTP_PARAM_MAX_VALUE_SIZE);
+		while (p_parse[0] == ' ') {
+			p_parse++;
+			line_consumed++;
+			token_length--;
+		}
+
+		COPY_TOKEN(p_request->headers[p_request->num_headers].value, HTTP_HEADER_MAX_VALUE_SIZE);
 
 		CONSUME_TOKEN();
 		CONSUME_LINE();

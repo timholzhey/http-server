@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.16)
 project(http_server C)
 
 set(CMAKE_C_STANDARD 99)
@@ -19,11 +19,19 @@ include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/route
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/interface
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/static
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/http/mime
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/lexer
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/parser
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/stringifier
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/sha1
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/base64
 )
 
 add_executable(http_server
@@ -42,11 +50,19 @@ add_executable(http_server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/route/http_route.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/interface/http_interface.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/static/http_static.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/http/mime/http_mime.c
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake/websocket_handshake.c
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/json.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/lexer/json_lexer.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/parser/json_parser.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/stringifier/json_stringifier.c
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/sha1/sha1.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/base64/base64.c
 )
 
 add_definitions(-DSOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+
+# -lcrypto

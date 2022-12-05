@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "http_server.h"
 #include "common.h"
 #include "http_request.h"
@@ -237,9 +238,9 @@ static http_server_state_t http_server_state_off() {
 	m_http_server_internal.server_address.sin_addr.s_addr = inet_addr(m_http_server.ip_addr);
 	m_http_server_internal.server_address.sin_port = htons(m_http_server.port);
 
-	if (bind(m_http_server_internal.server_socket_fd, (struct sockaddr *)&m_http_server_internal.server_address, sizeof(m_http_server_internal.server_address)) < 0) {
-		unrecoverable_error("Failed to bind socket");
-		return HTTP_SERVER_STATE_OFF;
+	while (bind(m_http_server_internal.server_socket_fd, (struct sockaddr *)&m_http_server_internal.server_address, sizeof(m_http_server_internal.server_address)) < 0) {
+		internal_error("Failed to bind socket");
+		m_http_server_internal.server_address.sin_port = htons(++m_http_server.port);
 	}
 
 	// listen for connections
@@ -267,7 +268,7 @@ static http_server_state_t http_server_state_idle() {
 }
 
 static http_server_state_t http_server_state_running() {
-	if (!m_http_server_internal.request.payload_pending) {
+	if (!m_http_server_internal.request.payload_pending || m_http_server_internal.buffer_in_len == 0) {
 		// receive
 		int32_t bytes_received = (int32_t) recv(m_http_server_internal.client_socket_fd, m_http_server_internal.buffer_in + m_http_server_internal.buffer_in_len, HTTP_SERVER_BUFFER_IN_SIZE - m_http_server_internal.buffer_in_len, 0);
 		if (bytes_received == 0) {
@@ -308,7 +309,7 @@ static http_server_state_t http_server_state_running() {
 			internal_error("Response payload too large");
 			return HTTP_SERVER_STATE_IDLE;
 		}
-		m_http_server_internal.dynamic_buffer_out = malloc(m_http_server_internal.response.payload_length);
+		m_http_server_internal.dynamic_buffer_out = malloc(HTTP_SERVER_STATIC_BUFFER_OUT_SIZE + m_http_server_internal.response.payload_length);
 		if (m_http_server_internal.dynamic_buffer_out == NULL) {
 			internal_error("Failed to allocate dynamic buffer");
 			return HTTP_SERVER_STATE_IDLE;
@@ -328,7 +329,9 @@ static http_server_state_t http_server_state_running() {
 		return HTTP_SERVER_STATE_OFF;
 	}
 
-	log_debug("Sent response %d/%d", bytes_sent, m_http_server_internal.buffer_out_len);
+	if (m_http_server_internal.response.payload_length < HTTP_SERVER_STATIC_BUFFER_OUT_SIZE) {
+		log_debug("Sent response %d: %.*s", bytes_sent, bytes_sent, buffer_out);
+	}
 
 	// consume buffer
 	m_http_server_internal.buffer_in_len -= bytes_parsed;
@@ -344,7 +347,9 @@ static http_server_state_t http_server_state_running() {
 		m_http_server_internal.dynamic_buffer_out_allocated = false;
 	}
 
-	return HTTP_SERVER_STATE_RUNNING;
+	close(m_http_server_internal.client_socket_fd);
+
+	return HTTP_SERVER_STATE_IDLE;
 }
 
 static http_server_state_t http_server_state_stop() {

@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <http_mime.h>
 
 #define HTTP_STATIC_MAX_PATH_SIZE			1024
 
@@ -55,6 +57,17 @@ ret_code_t http_static_route(http_request_t *p_request, http_response_t *p_respo
 		strcat(path, "index.html");
 	}
 
+	char *extension = strrchr(path, '.');
+	for (char *c = extension; *c != '\0'; c++) {
+		*c = tolower(*c);
+	}
+	const char *content_type = NULL;
+	if (http_mime_get(extension, &content_type) != RET_CODE_OK) {
+		http_headers_set_value_string(p_response->headers, &p_response->num_headers, "Content-Type", "text/plain");
+	} else {
+		http_headers_set_value_string(p_response->headers, &p_response->num_headers, "Content-Type", content_type);
+	}
+
 	if (access(path, F_OK) != 0) {
 		return RET_CODE_ERROR;
 	}
@@ -78,11 +91,13 @@ ret_code_t http_static_route(http_request_t *p_request, http_response_t *p_respo
 	if (file_size > HTTP_RESPONSE_MAX_STATIC_PAYLOAD_SIZE) {
 		if (file_size > HTTP_RESPONSE_MAX_DYNAMIC_PAYLOAD_SIZE) {
 			log_error("File %s is too large", path);
+			fclose(file);
 			return RET_CODE_ERROR;
 		}
 		p_response->dynamic_payload = malloc(file_size);
 		if (p_response->dynamic_payload == NULL) {
 			log_error("Error allocating memory for file %s", path);
+			fclose(file);
 			return RET_CODE_ERROR;
 		}
 		p_response->dynamic_payload_allocated = true;
@@ -92,6 +107,8 @@ ret_code_t http_static_route(http_request_t *p_request, http_response_t *p_respo
 	}
 
 	p_response->status_code = HTTP_STATUS_CODE_OK;
+
+	fclose(file);
 
 	return RET_CODE_OK;
 }

@@ -8,13 +8,13 @@
 #include "common.h"
 #include <stdint.h>
 
-#define HTTP_PARAM_MAX_KEY_SIZE			1024
-#define HTTP_PARAM_MAX_VALUE_SIZE			1024
+#define HTTP_HEADER_MAX_KEY_SIZE			1024
+#define HTTP_HEADER_MAX_VALUE_SIZE			1024
 #define HTTP_MAX_NUM_HEADERS				100
 
 typedef struct {
-	char key[HTTP_PARAM_MAX_KEY_SIZE];
-	char value[HTTP_PARAM_MAX_VALUE_SIZE];
+	char key[HTTP_HEADER_MAX_KEY_SIZE];
+	char value[HTTP_HEADER_MAX_VALUE_SIZE];
 } http_header_t;
 
 ret_code_t http_headers_set_value_string(http_header_t *p_headers, uint32_t *p_num_headers, const char *key, const char *value);

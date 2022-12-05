@@ -6,17 +6,67 @@
 </head>
 <body>
     <h1>Hello World</h1>
-    <div style="display: flex; flex-direction: column;">
-        <a href="/nonexistent">Example 404</a>
+    <div style="display: flex; flex-direction: column; width: 20em;">
+        <a href="/nonexistent">Example 404 route</a>
         <a href="/get_route?myparam=Hi">Example GET route</a>
         <a href="/post_route">Example POST route</a>
+        <button id="post_button">Example POST request</button>
+        <button id="penetrate_button">Spam 100 POST requests</button>
         <p id="post_response"></p>
+        <div style="height: 1em; width: 0; background-color: red;" id="post_progress"></div>
+        <p>Example image:</p>
         <img src="troll.webp" alt="troll">
+        <a href="troll.webp">troll.webp</a>
     </div>
     <script>
-        fetch("/post_route", {method: "POST", body: JSON.stringify({myparam: "Hi"})})
-            .then(response => response.text())
-            .then(text => document.querySelector("#post_response").innerText = text);
+        document.getElementById("post_button").addEventListener("click", function() {
+            document.getElementById("post_response").innerText = "Loading...";
+            fetch("/post_route", {
+                method: "POST",
+                body: JSON.stringify({
+                    "myparam": "Hi"
+                })
+            }).then(response => response.text()).then(text => {
+                document.getElementById("post_response").innerText = text;
+            });
+        });
+        document.getElementById("penetrate_button").addEventListener("click", function() {
+            for (let i = 0; i < 100; i++) {
+                fetch("/post_route", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        "myparam": "Hi"
+                    })
+                }).then(response => {
+                    document.getElementById("post_progress").style.width = (i + 1) + "%";
+                });
+            }
+        });
+        let socket = new WebSocket(`ws://${window.location.host}/websocket`);
+
+        socket.onopen = function(e) {
+            console.log("[open] Connection established");
+            console.log("Sending to server");
+            socket.send("My name is John");
+        };
+
+        socket.onmessage = function(event) {
+            console.log(`[message] Data received from server: ${event.data}`);
+        };
+
+        socket.onclose = function(event) {
+            if (event.wasClean) {
+                console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+            } else {
+                // e.g. server process killed or network down
+                // event.code is usually 1006 in this case
+                console.log('[close] Connection died');
+            }
+        };
+
+        socket.onerror = function(error) {
+            console.log(`[error]`);
+        };
     </script>
 </body>
 </html>
