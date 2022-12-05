@@ -138,8 +138,11 @@ ret_code_t http_request_parse(uint8_t *p_data, uint32_t data_len, http_request_t
 	}
 
 	if (http_headers_get_value_numeric(p_request->headers, p_request->num_headers, "Content-Length", &p_request->payload_length) == RET_CODE_OK) {
-		p_request->payload_pending = 1;
-		p_request->payload_pending_length = p_request->payload_length;
+		if (p_request->payload_length > 0) {
+			p_request->payload_pending = 1;
+			p_request->payload_pending_length = p_request->payload_length;
+			return RET_CODE_BUSY;
+		}
 	}
 
 	return RET_CODE_OK;

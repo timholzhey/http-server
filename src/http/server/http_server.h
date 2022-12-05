@@ -7,11 +7,13 @@
 
 #include <stdint.h>
 #include "http_interface.h"
+#include "http_method.h"
 
 #define HTTP_SERVER_MAX_NUM_ROUTES			100
 #define HTTP_SERVER_MAX_NUM_HOOKS			100
 #define HTTP_SERVER_BUFFER_IN_SIZE			(10 * 1024)
-#define HTTP_SERVER_BUFFER_OUT_SIZE			(10 * 1024)
+#define HTTP_SERVER_STATIC_BUFFER_OUT_SIZE	(10 * 1024)
+#define HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE	(100 * 1024 * 1024)
 #define HTTP_SERVER_DEFAULT_IP_ADDRESS		"127.0.0.1"
 #define HTTP_SERVER_DEFAULT_PORT			5123
 
@@ -42,7 +44,20 @@ void http_server_serve_static(const char *path);
 		http_response_interface_t response; \
 		http_interface_init_request(&request);  \
 		http_interface_init_response(&response); \
-		body                         \
+        {body}                         \
+	}
+
+#define HTTP_ROUTE_METHOD(name, _method, body) \
+	void name(void) { \
+        http_request_interface_t request; \
+        http_response_interface_t response; \
+        http_interface_init_request(&request);  \
+        http_interface_init_response(&response); \
+        if (request.method != (_method)) {     \
+            http_interface_method_not_allowed(&response);	   \
+            return; \
+        }                                           \
+        {body}                                      \
 	}
 
 #endif //HTTP_SERVER_HTTP_SERVER_H

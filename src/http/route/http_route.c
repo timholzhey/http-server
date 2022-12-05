@@ -25,8 +25,8 @@ ret_code_t http_route_forward(http_request_t *p_request, http_response_t *p_resp
 
 		uint32_t length = p_delim == NULL ? strlen(p_request->uri) : p_delim - p_request->uri;
 		if (strncmp(p_request->uri, p_routes[i].path, length) == 0 && strlen(p_routes[i].path) == length) {
-			was_handled = true;
 			p_routes[i].handler();
+			was_handled = true;
 			break;
 		}
 	}

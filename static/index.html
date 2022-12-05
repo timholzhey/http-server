@@ -7,8 +7,16 @@
 <body>
     <h1>Hello World</h1>
     <div style="display: flex; flex-direction: column;">
-        <a href="/route?myparam=Hi">Example route</a>
         <a href="/nonexistent">Example 404</a>
+        <a href="/get_route?myparam=Hi">Example GET route</a>
+        <a href="/post_route">Example POST route</a>
+        <p id="post_response"></p>
+        <img src="troll.webp" alt="troll">
     </div>
+    <script>
+        fetch("/post_route", {method: "POST", body: JSON.stringify({myparam: "Hi"})})
+            .then(response => response.text())
+            .then(text => document.querySelector("#post_response").innerText = text);
+    </script>
 </body>
 </html>

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
 #include "http_server.h"
 #include "common.h"
 #include "http_request.h"
@@ -49,7 +50,9 @@ static struct {
 	struct sockaddr_in client_address;
 	socklen_t client_address_len;
 	uint8_t buffer_in[HTTP_SERVER_BUFFER_IN_SIZE];
-	uint8_t buffer_out[HTTP_SERVER_BUFFER_OUT_SIZE];
+	uint8_t buffer_out[HTTP_SERVER_STATIC_BUFFER_OUT_SIZE];
+	uint8_t *dynamic_buffer_out;
+	bool dynamic_buffer_out_allocated;
 	uint32_t buffer_in_len;
 	uint32_t buffer_out_len;
 	http_request_t request;
@@ -264,22 +267,27 @@ static http_server_state_t http_server_state_idle() {
 }
 
 static http_server_state_t http_server_state_running() {
-	// receive
-	int32_t bytes_received = (int32_t) recv(m_http_server_internal.client_socket_fd, m_http_server_internal.buffer_in + m_http_server_internal.buffer_in_len, HTTP_SERVER_BUFFER_IN_SIZE - m_http_server_internal.buffer_in_len, 0);
-	if (bytes_received == 0) {
-		log_debug("Client disconnected");
-		return HTTP_SERVER_STATE_IDLE;
-	} else if (bytes_received < 0) {
-		unrecoverable_error("Failed to receive data from client");
-		return HTTP_SERVER_STATE_OFF;
-	}
+	if (!m_http_server_internal.request.payload_pending) {
+		// receive
+		int32_t bytes_received = (int32_t) recv(m_http_server_internal.client_socket_fd, m_http_server_internal.buffer_in + m_http_server_internal.buffer_in_len, HTTP_SERVER_BUFFER_IN_SIZE - m_http_server_internal.buffer_in_len, 0);
+		if (bytes_received == 0) {
+			log_debug("Client disconnected");
+			return HTTP_SERVER_STATE_IDLE;
+		} else if (bytes_received < 0) {
+			unrecoverable_error("Failed to receive data from client");
+			return HTTP_SERVER_STATE_OFF;
+		}
 
-	m_http_server_internal.buffer_in_len += bytes_received;
+		m_http_server_internal.buffer_in_len += bytes_received;
+	}
 
 	// parse request
 	uint32_t bytes_parsed = 0;
 	ret_code_t ret = http_request_parse(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in_len, &m_http_server_internal.request, &bytes_parsed);
 	if (ret == RET_CODE_BUSY) {
+		// consume buffer
+		m_http_server_internal.buffer_in_len -= bytes_parsed;
+		memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_parsed, m_http_server_internal.buffer_in_len);
 		return HTTP_SERVER_STATE_RUNNING;
 	}
 	if (ret != RET_CODE_OK) {
@@ -293,17 +301,34 @@ static http_server_state_t http_server_state_running() {
 	http_request_handle(&m_http_server_internal.request, &m_http_server_internal.response,
 						m_http_server.routes, m_http_server.num_routes);
 
+	uint8_t *buffer_out = m_http_server_internal.buffer_out;
+	uint32_t max_buffer_out_len = HTTP_SERVER_STATIC_BUFFER_OUT_SIZE;
+	if (m_http_server_internal.response.payload_length > HTTP_SERVER_STATIC_BUFFER_OUT_SIZE) {
+		if (m_http_server_internal.response.payload_length > HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE) {
+			internal_error("Response payload too large");
+			return HTTP_SERVER_STATE_IDLE;
+		}
+		m_http_server_internal.dynamic_buffer_out = malloc(m_http_server_internal.response.payload_length);
+		if (m_http_server_internal.dynamic_buffer_out == NULL) {
+			internal_error("Failed to allocate dynamic buffer");
+			return HTTP_SERVER_STATE_IDLE;
+		}
+		m_http_server_internal.dynamic_buffer_out_allocated = true;
+		buffer_out = m_http_server_internal.dynamic_buffer_out;
+		max_buffer_out_len = HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE;
+	}
+
 	// build response
-	http_response_build(&m_http_server_internal.response, m_http_server_internal.buffer_out, &m_http_server_internal.buffer_out_len, HTTP_SERVER_BUFFER_OUT_SIZE);
+	http_response_build(&m_http_server_internal.response, buffer_out, &m_http_server_internal.buffer_out_len, max_buffer_out_len);
 
 	// send response
-	int32_t bytes_sent = (int32_t) send(m_http_server_internal.client_socket_fd, m_http_server_internal.buffer_out, m_http_server_internal.buffer_out_len, 0);
+	int32_t bytes_sent = (int32_t) send(m_http_server_internal.client_socket_fd, buffer_out, m_http_server_internal.buffer_out_len, 0);
 	if (bytes_sent < 0) {
 		unrecoverable_error("Failed to send response to client");
 		return HTTP_SERVER_STATE_OFF;
 	}
 
-	log_debug("Sent response to client: %.*s", bytes_sent, m_http_server_internal.buffer_out);
+	log_debug("Sent response %d/%d", bytes_sent, m_http_server_internal.buffer_out_len);
 
 	// consume buffer
 	m_http_server_internal.buffer_in_len -= bytes_parsed;
@@ -311,7 +336,13 @@ static http_server_state_t http_server_state_running() {
 
 	// clear
 	memset(&m_http_server_internal.request, 0, sizeof(m_http_server_internal.request));
+	http_response_reset(&m_http_server_internal.response);
 	memset(&m_http_server_internal.response, 0, sizeof(m_http_server_internal.response));
+
+	if (m_http_server_internal.dynamic_buffer_out_allocated) {
+		free(m_http_server_internal.dynamic_buffer_out);
+		m_http_server_internal.dynamic_buffer_out_allocated = false;
+	}
 
 	return HTTP_SERVER_STATE_RUNNING;
 }

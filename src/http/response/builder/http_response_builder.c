@@ -29,7 +29,11 @@ ret_code_t http_response_build(http_response_t *p_response, uint8_t *p_data, uin
 			log_error("Payload too large");
 			return RET_CODE_ERROR;
 		}
-		memcpy(p_data + *p_data_len, p_response->payload, p_response->payload_length);
+		if (p_response->dynamic_payload_allocated) {
+			memcpy(p_data + *p_data_len, p_response->dynamic_payload, p_response->payload_length);
+		} else {
+			memcpy(p_data + *p_data_len, p_response->payload, p_response->payload_length);
+		}
 		*p_data_len += p_response->payload_length;
 	}
 

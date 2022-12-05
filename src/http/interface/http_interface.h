@@ -22,7 +22,9 @@ typedef struct {
 } http_server_interface_t;
 
 typedef struct {
+	http_method_t method;
 	char *(*param)(const char *name);
+	char *(*body)(void);
 } http_request_interface_t;
 
 typedef struct {
@@ -38,5 +40,7 @@ void http_interface_environment_reset();
 
 void http_interface_init_request(http_request_interface_t *p_interface);
 void http_interface_init_response(http_response_interface_t *p_interface);
+
+void http_interface_method_not_allowed(http_response_interface_t *p_response);
 
 #endif //HTTP_SERVER_HTTP_INTERFACE_H

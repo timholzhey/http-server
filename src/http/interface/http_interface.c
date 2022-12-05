@@ -33,8 +33,8 @@ static void http_response_text(const char *text) {
 	}
 
 	uint32_t len = strlen(text);
-	if (len > HTTP_RESPONSE_MAX_PAYLOAD_SIZE) {
-		len = HTTP_RESPONSE_MAX_PAYLOAD_SIZE;
+	if (len > HTTP_RESPONSE_MAX_STATIC_PAYLOAD_SIZE) {
+		len = HTTP_RESPONSE_MAX_STATIC_PAYLOAD_SIZE;
 	}
 
 	m_env.p_response->payload_length = len;
@@ -70,8 +70,8 @@ static void http_response_append(const char *text) {
 	}
 
 	uint32_t len = strlen(text);
-	if (len > HTTP_RESPONSE_MAX_PAYLOAD_SIZE - m_env.p_response->payload_length) {
-		len = HTTP_RESPONSE_MAX_PAYLOAD_SIZE - m_env.p_response->payload_length;
+	if (len > HTTP_RESPONSE_MAX_STATIC_PAYLOAD_SIZE - m_env.p_response->payload_length) {
+		len = HTTP_RESPONSE_MAX_STATIC_PAYLOAD_SIZE - m_env.p_response->payload_length;
 	}
 
 	memcpy(m_env.p_response->payload + m_env.p_response->payload_length, text, len);
@@ -115,8 +115,21 @@ static char *http_request_get_param(const char *key) {
 	return value;
 }
 
+char *http_request_get_body() {
+	char *body = NULL;
+	if (allocate((void **) &body, m_env.p_request->payload_length + 1) != RET_CODE_OK) {
+		return NULL;
+	}
+
+	memcpy(body, m_env.p_request->payload, m_env.p_request->payload_length);
+	body[m_env.p_request->payload_length] = '\0';
+	return body;
+}
+
 void http_interface_init_request(http_request_interface_t *p_interface) {
+	p_interface->method = m_env.p_request->method;
 	p_interface->param = http_request_get_param;
+	p_interface->body = http_request_get_body;
 }
 
 void http_interface_init_response(http_response_interface_t *p_interface) {
@@ -125,4 +138,12 @@ void http_interface_init_response(http_response_interface_t *p_interface) {
 	p_interface->text = http_response_text;
 	p_interface->status = http_response_status;
 	p_interface->append = http_response_append;
+}
+
+void http_interface_method_not_allowed(http_response_interface_t *p_response) {
+	p_response->html("<!DOCTYPE html>\n"
+					 "<title>405 Method Not Allowed</title>\n"
+					 "<h1>Method Not Allowed</h1>\n"
+					 "<p>The method is not allowed for the requested URL.</p>");
+	p_response->status(HTTP_STATUS_CODE_METHOD_NOT_ALLOWED);
 }

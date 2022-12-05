@@ -2,6 +2,7 @@
 // Created by Tim Holzhey on 03.12.22.
 //
 
+#include <stdlib.h>
 #include "http_response.h"
 
 ret_code_t http_response_print(http_response_t *p_response) {
@@ -17,4 +18,13 @@ ret_code_t http_response_print(http_response_t *p_response) {
 	log_debug("}");
 
 	return RET_CODE_OK;
+}
+
+void http_response_reset(http_response_t *p_response) {
+	if (p_response == NULL) {
+		return;
+	}
+	if (p_response->dynamic_payload_allocated) {
+		free(p_response->dynamic_payload);
+	}
 }
