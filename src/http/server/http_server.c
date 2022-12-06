@@ -9,6 +9,9 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
 #include "http_server.h"
 #include "common.h"
 #include "http_request.h"
@@ -18,6 +21,7 @@
 #include "http_route.h"
 #include "http_response_builder.h"
 #include "http_static.h"
+#include "websocket_server.h"
 
 #define HTTP_SERVER_MAX_ERROR_DESC_LENGTH		100
 #define HTTP_SERVER_IP_ADDRESS_LENGTH			16
@@ -25,7 +29,6 @@
 typedef enum {
 	HTTP_SERVER_STATE_OFF,
 	HTTP_SERVER_STATE_IDLE,
-	HTTP_SERVER_STATE_RUNNING,
 	HTTP_SERVER_STATE_STOP,
 } http_server_state_t;
 
@@ -44,9 +47,22 @@ static struct {
 	bool serve_static;
 } m_http_server;
 
+typedef enum {
+	HTTP_SERVER_PROTOCOL_HTTP,
+	HTTP_SERVER_PROTOCOL_WEBSOCKET,
+} http_server_protocol_t;
+
+typedef struct {
+	int socket_fd;
+	uint32_t activity_timestamp;
+	uint32_t keep_alive_timeout;
+	http_server_protocol_t protocol;
+} http_client_t;
+
 static struct {
 	int server_socket_fd;
-	int client_socket_fd;
+	http_client_t clients[HTTP_SERVER_MAX_NUM_CLIENTS];
+	uint32_t num_clients;
 	struct sockaddr_in server_address;
 	struct sockaddr_in client_address;
 	socklen_t client_address_len;
@@ -62,8 +78,17 @@ static struct {
 
 static http_server_state_t http_server_state_off();
 static http_server_state_t http_server_state_idle();
-static http_server_state_t http_server_state_running();
 static http_server_state_t http_server_state_stop();
+
+static ret_code_t http_server_handle_connection(http_client_t *client);
+
+static void http_server_process();
+
+static uint32_t http_server_get_timestamp() {
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 
 static void internal_error(const char *error_desc) {
 	m_http_server.internal_error = true;
@@ -102,12 +127,9 @@ void http_server_serve_static(const char *path) {
 void http_server_start(void) {
 	switch (m_http_server.state) {
 		case HTTP_SERVER_STATE_OFF:
-			internal_error("Cannot start server: Server is not initialized");
+			http_server_process();
 			break;
 		case HTTP_SERVER_STATE_IDLE:
-			m_http_server.state = HTTP_SERVER_STATE_RUNNING;
-			break;
-		case HTTP_SERVER_STATE_RUNNING:
 			internal_error("Cannot start server: Server is already running");
 			break;
 		default:
@@ -124,10 +146,8 @@ void http_server_stop(void) {
 			internal_error("Cannot stop server: Server is not initialized");
 			break;
 		case HTTP_SERVER_STATE_IDLE:
-			internal_error("Cannot stop server: Server is not running");
-			break;
-		case HTTP_SERVER_STATE_RUNNING:
-			m_http_server.state = HTTP_SERVER_STATE_IDLE;
+			m_http_server.state = HTTP_SERVER_STATE_STOP;
+			http_server_process();
 			break;
 		default:
 			unrecoverable_error("Invalid state");
@@ -168,9 +188,6 @@ static void http_server_process() {
 			break;
 		case HTTP_SERVER_STATE_IDLE:
 			m_http_server.state = http_server_state_idle();
-			break;
-		case HTTP_SERVER_STATE_RUNNING:
-			m_http_server.state = http_server_state_running();
 			break;
 		case HTTP_SERVER_STATE_STOP:
 			m_http_server.state = http_server_state_stop();
@@ -249,93 +266,177 @@ static http_server_state_t http_server_state_off() {
 		return HTTP_SERVER_STATE_OFF;
 	}
 
+	// set to non-blocking mode
+	if (fcntl(m_http_server_internal.server_socket_fd, F_SETFL, O_NONBLOCK) < 0) {
+		unrecoverable_error("Failed to set socket to non-blocking mode");
+		return HTTP_SERVER_STATE_OFF;
+	}
+
 	log_debug("Server listening on http://%s:%d", m_http_server.ip_addr, m_http_server.port);
 
 	return HTTP_SERVER_STATE_IDLE;
 }
 
 static http_server_state_t http_server_state_idle() {
+	for (uint32_t i = 0; i < m_http_server_internal.num_clients; i++) {
+		http_client_t *client = &m_http_server_internal.clients[i];
+
+		ret_code_t ret = http_server_handle_connection(client);
+		if (ret != RET_CODE_BUSY) {
+			log_debug("Dropping connection %d", client->socket_fd);
+			close(client->socket_fd);
+			// remove client
+			for (uint32_t j = i; j < m_http_server_internal.num_clients - 1; j++) {
+				memcpy(&m_http_server_internal.clients[j], &m_http_server_internal.clients[j + 1], sizeof(http_client_t));
+			}
+			m_http_server_internal.num_clients--;
+			m_http_server_internal.buffer_in_len = 0;
+			m_http_server_internal.buffer_out_len = 0;
+		}
+	}
+
 	// accept connection with client
-	m_http_server_internal.client_socket_fd = accept(m_http_server_internal.server_socket_fd, (struct sockaddr *)&m_http_server_internal.client_address, (socklen_t *)&m_http_server_internal.client_address_len);
-	if (m_http_server_internal.client_socket_fd < 0) {
-		unrecoverable_error("Failed to accept connection with client");
+	m_http_server_internal.clients[m_http_server_internal.num_clients].socket_fd = accept(
+			m_http_server_internal.server_socket_fd, (struct sockaddr *) &m_http_server_internal.client_address,
+			&m_http_server_internal.client_address_len);
+	if (m_http_server_internal.clients[m_http_server_internal.num_clients].socket_fd < 0) {
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			unrecoverable_error("Failed to accept connection with client");
+			return HTTP_SERVER_STATE_OFF;
+		}
+		return HTTP_SERVER_STATE_IDLE;
+	}
+
+	log_debug("Accepted connection %d", m_http_server_internal.clients[m_http_server_internal.num_clients].socket_fd);
+
+	// set non blocking mode
+	if (fcntl(m_http_server_internal.clients[m_http_server_internal.num_clients].socket_fd, F_SETFL, O_NONBLOCK) < 0) {
+		unrecoverable_error("Failed to set socket to non-blocking mode");
 		return HTTP_SERVER_STATE_OFF;
 	}
 
-	log_debug("Accepted connection");
-
-	return HTTP_SERVER_STATE_RUNNING;
-}
-
-static http_server_state_t http_server_state_running() {
-	if (!m_http_server_internal.request.payload_pending || m_http_server_internal.buffer_in_len == 0) {
-		// receive
-		int32_t bytes_received = (int32_t) recv(m_http_server_internal.client_socket_fd, m_http_server_internal.buffer_in + m_http_server_internal.buffer_in_len, HTTP_SERVER_BUFFER_IN_SIZE - m_http_server_internal.buffer_in_len, 0);
-		if (bytes_received == 0) {
-			log_debug("Client disconnected");
-			return HTTP_SERVER_STATE_IDLE;
-		} else if (bytes_received < 0) {
-			unrecoverable_error("Failed to receive data from client");
-			return HTTP_SERVER_STATE_OFF;
-		}
-
-		m_http_server_internal.buffer_in_len += bytes_received;
+	// set keep alive
+	int opt = 1;
+	if (setsockopt(m_http_server_internal.clients[m_http_server_internal.num_clients].socket_fd, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt))) {
+		unrecoverable_error("Failed to set socket options");
+		return HTTP_SERVER_STATE_OFF;
 	}
 
+	// init client
+	m_http_server_internal.clients[m_http_server_internal.num_clients].activity_timestamp = http_server_get_timestamp();
+	m_http_server_internal.clients[m_http_server_internal.num_clients].keep_alive_timeout = HTTP_SERVER_KEEP_ALIVE_TIMEOUT_MS;
+	m_http_server_internal.clients[m_http_server_internal.num_clients].protocol = HTTP_SERVER_PROTOCOL_HTTP;
+
+	// add client to list of clients
+	m_http_server_internal.num_clients++;
+
+	return HTTP_SERVER_STATE_IDLE;
+}
+
+static ret_code_t http_server_handle(http_client_t *client, uint8_t *p_data_in, uint32_t data_in_len, uint32_t *p_num_bytes_consumed,
+		uint8_t **pp_data_out, uint32_t *p_data_out_len, uint32_t max_data_out_len) {
 	// parse request
-	uint32_t bytes_parsed = 0;
-	ret_code_t ret = http_request_parse(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in_len, &m_http_server_internal.request, &bytes_parsed);
+	ret_code_t ret = http_request_parse(p_data_in, data_in_len, &m_http_server_internal.request, p_num_bytes_consumed);
 	if (ret == RET_CODE_BUSY) {
-		// consume buffer
-		m_http_server_internal.buffer_in_len -= bytes_parsed;
-		memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_parsed, m_http_server_internal.buffer_in_len);
-		return HTTP_SERVER_STATE_RUNNING;
+		return RET_CODE_BUSY;
 	}
 	if (ret != RET_CODE_OK) {
 		internal_error("Failed to parse HTTP request");
-		return HTTP_SERVER_STATE_IDLE;
+		return RET_CODE_ERROR;
 	}
 
 	http_request_print(&m_http_server_internal.request);
 
 	// handle request
+	bool is_websocket_upgrade = false;
 	http_request_handle(&m_http_server_internal.request, &m_http_server_internal.response,
-						m_http_server.routes, m_http_server.num_routes);
+						m_http_server.routes, m_http_server.num_routes, &is_websocket_upgrade);
+	if (is_websocket_upgrade) {
+		client->protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
+	}
 
-	uint8_t *buffer_out = m_http_server_internal.buffer_out;
-	uint32_t max_buffer_out_len = HTTP_SERVER_STATIC_BUFFER_OUT_SIZE;
 	if (m_http_server_internal.response.payload_length > HTTP_SERVER_STATIC_BUFFER_OUT_SIZE) {
 		if (m_http_server_internal.response.payload_length > HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE) {
 			internal_error("Response payload too large");
-			return HTTP_SERVER_STATE_IDLE;
+			return RET_CODE_ERROR;
 		}
 		m_http_server_internal.dynamic_buffer_out = malloc(HTTP_SERVER_STATIC_BUFFER_OUT_SIZE + m_http_server_internal.response.payload_length);
 		if (m_http_server_internal.dynamic_buffer_out == NULL) {
 			internal_error("Failed to allocate dynamic buffer");
-			return HTTP_SERVER_STATE_IDLE;
+			return RET_CODE_ERROR;
 		}
 		m_http_server_internal.dynamic_buffer_out_allocated = true;
-		buffer_out = m_http_server_internal.dynamic_buffer_out;
-		max_buffer_out_len = HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE;
+		*pp_data_out = m_http_server_internal.dynamic_buffer_out;
+		max_data_out_len = HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE;
 	}
 
 	// build response
-	http_response_build(&m_http_server_internal.response, buffer_out, &m_http_server_internal.buffer_out_len, max_buffer_out_len);
+	if (http_response_build(&m_http_server_internal.response, *pp_data_out, p_data_out_len, max_data_out_len) != RET_CODE_OK) {
+		internal_error("Failed to build HTTP response");
+		return RET_CODE_ERROR;
+	}
+
+	return RET_CODE_OK;
+}
+
+static ret_code_t http_server_handle_connection(http_client_t *client) {
+	if (!m_http_server_internal.request.payload_pending || m_http_server_internal.buffer_in_len == 0) {
+		// receive
+		int32_t bytes_received = (int32_t) recv(client->socket_fd, m_http_server_internal.buffer_in + m_http_server_internal.buffer_in_len, HTTP_SERVER_BUFFER_IN_SIZE - m_http_server_internal.buffer_in_len, 0);
+		if (bytes_received == 0) {
+			log_debug("Client %d closed connection", client->socket_fd);
+			return RET_CODE_OK;
+		} else if (bytes_received < 0) {
+			if (errno != EAGAIN && errno != EWOULDBLOCK) {
+				unrecoverable_error("Failed to receive data from client");
+				return RET_CODE_ERROR;
+			}
+			// check timeout
+			if (http_server_get_timestamp() - client->activity_timestamp > client->keep_alive_timeout) {
+				log_debug("Client %d timed out", client->socket_fd);
+				return RET_CODE_OK;
+			}
+
+			return RET_CODE_BUSY;
+		}
+
+		client->activity_timestamp = http_server_get_timestamp();
+
+		m_http_server_internal.buffer_in_len += bytes_received;
+
+		log_debug("Received %d bytes on connection %d", bytes_received, client->socket_fd);
+	}
+
+	ret_code_t ret;
+	uint32_t bytes_consumed = 0;
+	uint8_t *p_buffer_out = m_http_server_internal.buffer_out;
+	switch (client->protocol) {
+		case HTTP_SERVER_PROTOCOL_HTTP:
+			ret = http_server_handle(client, m_http_server_internal.buffer_in, m_http_server_internal.buffer_in_len, &bytes_consumed,
+							 &p_buffer_out, &m_http_server_internal.buffer_out_len, HTTP_SERVER_STATIC_BUFFER_OUT_SIZE);
+			break;
+		case HTTP_SERVER_PROTOCOL_WEBSOCKET:
+			ret = websocket_server_handle(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in_len, &bytes_consumed,
+										  &p_buffer_out, &m_http_server_internal.buffer_out_len, HTTP_SERVER_STATIC_BUFFER_OUT_SIZE);
+			break;
+		default:
+			internal_error("Invalid protocol");
+			return RET_CODE_ERROR;
+	}
+	if (ret == RET_CODE_OK || ret == RET_CODE_BUSY) {
+		// consume buffer
+		m_http_server_internal.buffer_in_len -= bytes_consumed;
+		memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_consumed, m_http_server_internal.buffer_in_len);
+	}
 
 	// send response
-	int32_t bytes_sent = (int32_t) send(m_http_server_internal.client_socket_fd, buffer_out, m_http_server_internal.buffer_out_len, 0);
+	int32_t bytes_sent = (int32_t) send(client->socket_fd, p_buffer_out, m_http_server_internal.buffer_out_len, 0);
 	if (bytes_sent < 0) {
 		unrecoverable_error("Failed to send response to client");
-		return HTTP_SERVER_STATE_OFF;
+		return RET_CODE_ERROR;
 	}
 
-	if (m_http_server_internal.response.payload_length < HTTP_SERVER_STATIC_BUFFER_OUT_SIZE) {
-		log_debug("Sent response %d: %.*s", bytes_sent, bytes_sent, buffer_out);
-	}
-
-	// consume buffer
-	m_http_server_internal.buffer_in_len -= bytes_parsed;
-	memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_parsed, m_http_server_internal.buffer_in_len);
+	log_debug("Sent %d bytes on connection %d", bytes_sent, client->socket_fd);
 
 	// clear
 	memset(&m_http_server_internal.request, 0, sizeof(m_http_server_internal.request));
@@ -347,9 +448,7 @@ static http_server_state_t http_server_state_running() {
 		m_http_server_internal.dynamic_buffer_out_allocated = false;
 	}
 
-	close(m_http_server_internal.client_socket_fd);
-
-	return HTTP_SERVER_STATE_IDLE;
+	return RET_CODE_BUSY;
 }
 
 static http_server_state_t http_server_state_stop() {

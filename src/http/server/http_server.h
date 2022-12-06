@@ -16,6 +16,8 @@
 #define HTTP_SERVER_DYNAMIC_BUFFER_OUT_SIZE	(100 * 1024 * 1024)
 #define HTTP_SERVER_DEFAULT_IP_ADDRESS		"127.0.0.1"
 #define HTTP_SERVER_DEFAULT_PORT			5123
+#define HTTP_SERVER_MAX_NUM_CLIENTS			1000
+#define HTTP_SERVER_KEEP_ALIVE_TIMEOUT_MS	10000
 
 void http_server_response(const char *response);
 void http_server_route(const char *path, void (*handler)(void));

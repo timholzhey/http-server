@@ -22,6 +22,7 @@ include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/mime
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json
@@ -52,6 +53,7 @@ add_executable(http_server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/static/http_static.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/http/mime/http_mime.c
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/server/websocket_server.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake/websocket_handshake.c
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/json.c

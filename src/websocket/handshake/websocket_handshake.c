@@ -8,7 +8,7 @@
 #include "sha1.h"
 #include "base64.h"
 
-#define SHA1_DIGEST_SIZE 20
+#define SHA1_DIGEST_SIZE		20
 
 ret_code_t websocket_handshake(http_request_t *p_request, http_response_t *p_response) {
 	p_response->status_code = HTTP_STATUS_CODE_SWITCHING_PROTOCOLS;

@@ -52,11 +52,15 @@ static bool is_websocket_upgrade(http_request_t *p_request) {
 	return true;
 }
 
-ret_code_t http_request_handle(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes) {
+ret_code_t http_request_handle(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes, bool *p_upgrade_websocket) {
 	// check websocket upgrade
 	if (is_websocket_upgrade(p_request)) {
-		websocket_handshake(p_request, p_response);
-		return RET_CODE_OK;
+		if (websocket_handshake(p_request, p_response) == RET_CODE_OK) {
+			*p_upgrade_websocket = true;
+			return RET_CODE_OK;
+		}
+		log_error("websocket handshake failed");
+		return RET_CODE_ERROR;
 	}
 
 	// set default content type header
