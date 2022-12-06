@@ -63,6 +63,7 @@ add_executable(http_server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/base64/base64.c
 )
 
-add_definitions(-DSOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-
-# -lcrypto
+add_definitions(
+    -DSOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    -DDEBUG_GLOBAL=1
+)

@@ -23,6 +23,8 @@ typedef enum {
 #define LOG_COLOR_RED		"\033[31m"
 #define LOG_COLOR_BLUE		"\033[34m"
 
+#if defined(DEBUG_GLOBAL) && DEBUG_GLOBAL == 1
+
 #define log_internal(color, ...) \
 	printf(color "%-20s: %-4d: ", FILENAME, __LINE__); \
 	printf(__VA_ARGS__); \
@@ -32,6 +34,14 @@ typedef enum {
 	printf(color); \
 	printf(__VA_ARGS__); \
 	printf(LOG_COLOR_WHITE);
+
+#else
+
+#define log_internal(color, ...)
+
+#define log_internal_raw(color, ...)
+
+#endif
 
 #define log_debug(...)			log_internal(LOG_COLOR_WHITE, __VA_ARGS__)
 #define log_error(...)			log_internal(LOG_COLOR_RED, __VA_ARGS__)
