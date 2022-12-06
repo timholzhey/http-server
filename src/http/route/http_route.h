@@ -8,12 +8,15 @@
 #include "common.h"
 #include "http_request.h"
 #include "http_response.h"
+#include "http_server.h"
 
 #define HTTP_SERVER_MAX_ROUTE_PATH_LENGTH	100
 
 typedef struct {
 	char path[HTTP_SERVER_MAX_ROUTE_PATH_LENGTH];
 	void (*handler)(void);
+	http_server_protocol_t protocol;
+	int id;
 } http_route_t;
 
 ret_code_t http_route_forward(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes);

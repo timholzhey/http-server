@@ -20,9 +20,25 @@ HTTP_ROUTE_METHOD(post_route, HTTP_METHOD_POST, {
 	response.append(val ? val->string : "null");
 })
 
+WEBSOCKET_ROUTE(ws_route, {
+	switch (websocket.event) {
+		case WEBSOCKET_EVENT_CONNECTED:
+			log_debug("Websocket: connected");
+			break;
+		case WEBSOCKET_EVENT_DISCONNECTED:
+			log_debug("Websocket: disconnected");
+			break;
+		case WEBSOCKET_EVENT_DATA:
+			log_debug("Websocket: data [%s]", websocket.data);
+			websocket.send("Hello from the server!");
+			break;
+	}
+})
+
 int main() {
 	app.route("get_route", get_route);
 	app.route("post_route", post_route);
+	app.websocket("ws_route", ws_route);
 	app.serve_static("static");
 	app.run();
 	return 0;

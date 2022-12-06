@@ -58,6 +58,10 @@ ret_code_t http_static_route(http_request_t *p_request, http_response_t *p_respo
 	}
 
 	char *extension = strrchr(path, '.');
+	if (extension == NULL) {
+		p_response->status_code = HTTP_STATUS_CODE_NOT_FOUND;
+		return RET_CODE_OK;
+	}
 	for (char *c = extension; *c != '\0'; c++) {
 		*c = tolower(*c);
 	}

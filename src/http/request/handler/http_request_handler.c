@@ -6,6 +6,8 @@
 #include "http_status.h"
 #include "websocket_handshake.h"
 #include <time.h>
+#include <websocket_route.h>
+#include <websocket_server.h>
 
 static void http_request_handle_404(http_request_t *p_request, http_response_t *p_response) {
 	const char *doc_404 = "<!DOCTYPE html>"
@@ -23,40 +25,12 @@ static void http_request_handle_404(http_request_t *p_request, http_response_t *
 	p_response->status_code = HTTP_STATUS_CODE_NOT_FOUND;
 }
 
-static bool is_websocket_upgrade(http_request_t *p_request) {
-	char upgrade[HTTP_HEADER_MAX_VALUE_SIZE];
-	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Upgrade", upgrade) != RET_CODE_OK) {
-		return false;
-	}
-	if (strcmp(upgrade, "websocket") != 0) {
-		return false;
-	}
-	char connection[HTTP_HEADER_MAX_VALUE_SIZE];
-	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Connection", connection) != RET_CODE_OK) {
-		return false;
-	}
-	if (strstr(connection, "Upgrade") == NULL) {
-		return false;
-	}
-	char sec_websocket_key[HTTP_HEADER_MAX_VALUE_SIZE];
-	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Key", sec_websocket_key) != RET_CODE_OK) {
-		return false;
-	}
-	char sec_websocket_version[HTTP_HEADER_MAX_VALUE_SIZE];
-	if (http_headers_get_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Version", sec_websocket_version) != RET_CODE_OK) {
-		return false;
-	}
-	if (strcmp(sec_websocket_version, "13") != 0) {
-		return false;
-	}
-	return true;
-}
-
 ret_code_t http_request_handle(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes, bool *p_upgrade_websocket) {
 	// check websocket upgrade
-	if (is_websocket_upgrade(p_request)) {
+	if (websocket_server_is_upgrade(p_request) && websocket_route_exists(p_request, p_routes, num_routes)) {
 		if (websocket_handshake(p_request, p_response) == RET_CODE_OK) {
 			*p_upgrade_websocket = true;
+			websocket_interface_set(WEBSOCKET_EVENT_CONNECTED);
 			return RET_CODE_OK;
 		}
 		log_error("websocket handshake failed");

@@ -24,6 +24,9 @@ include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/server
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/route
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/frame
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/interface
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/lexer
@@ -55,6 +58,9 @@ add_executable(http_server
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/server/websocket_server.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/handshake/websocket_handshake.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/route/websocket_route.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/frame/websocket_frame.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/websocket/interface/websocket_interface.c
 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/json.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/json/lexer/json_lexer.c

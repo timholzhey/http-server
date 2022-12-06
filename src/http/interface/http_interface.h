@@ -19,6 +19,7 @@ typedef struct {
 	void (*stop)(void);
 	void (*hook)(void (*hook)(void));
 	void (*serve_static)(const char *path);
+	void (*websocket)(const char *path, void (*handler)(void));
 } http_server_interface_t;
 
 typedef struct {
