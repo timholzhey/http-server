@@ -1,31 +1,8 @@
-/***********************************************************
-* Base64 library                                           *
-* @author Ahmed Elzoughby                                  *
-* @date July 23, 2017                                      *
-* Purpose: encode and decode base64 format                 *
-***********************************************************/
+#ifndef BASE64_H_INCLUDED
+#define BASE64_H_INCLUDED
 
-#ifndef BASE46_H
-#define BASE46_H
+#include <stddef.h>
 
-#include <stdlib.h>
-#include <memory.h>
+char *base64_encode(const void *buf, size_t size);
 
-
-/***********************************************
-Encodes ASCCI string into base64 format string
-@param plain ASCII string to be encoded
-@return encoded base64 format string
-***********************************************/
-char* base64_encode(char* plain);
-
-
-/***********************************************
-decodes base64 format string into ASCCI string
-@param plain encoded base64 format string
-@return ASCII string to be encoded
-***********************************************/
-char* base64_decode(char* cipher);
-
-
-#endif //BASE46_H
+#endif // BASE64_H_INCLUDED

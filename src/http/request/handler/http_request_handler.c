@@ -4,6 +4,7 @@
 
 #include "http_request_handler.h"
 #include "http_status.h"
+#include "websocket_handshake.h"
 #include <time.h>
 
 static void http_request_handle_404(http_request_t *p_request, http_response_t *p_response) {
@@ -54,9 +55,8 @@ static bool is_websocket_upgrade(http_request_t *p_request) {
 ret_code_t http_request_handle(http_request_t *p_request, http_response_t *p_response, http_route_t *p_routes, uint32_t num_routes) {
 	// check websocket upgrade
 	if (is_websocket_upgrade(p_request)) {
-		log_highlight("Websocket upgrade request");
 		websocket_handshake(p_request, p_response);
-		return RET_CODE_ERROR;
+		return RET_CODE_OK;
 	}
 
 	// set default content type header
