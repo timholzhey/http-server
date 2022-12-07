@@ -12,6 +12,9 @@
 #define MAX_TOKEN_LENGTH		1000
 
 json_ret_code_t json_parse(const char* p_data, size_t size, json_object_t* p_object) {
+	// Init
+	memset(p_object, 0, sizeof(json_object_t));
+
 	// Lex
 	json_token_t *tokens = malloc(MAX_TOKEN_LENGTH * sizeof(json_token_t));
 	uint32_t num_tokens = 0;

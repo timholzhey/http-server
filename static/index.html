@@ -33,7 +33,9 @@
                 document.getElementById("post_response").innerText = text;
             });
         });
+        let post_progress = 0;
         document.getElementById("penetrate_button").addEventListener("click", function() {
+            post_progress = 0;
             for (let i = 0; i < 100; i++) {
                 fetch("/post_route", {
                     method: "POST",
@@ -41,7 +43,8 @@
                         "myparam": "Hi"
                     })
                 }).then(response => {
-                    document.getElementById("post_progress").style.width = (i + 1) + "%";
+                    document.getElementById("post_progress").style.width = (post_progress / 100 * 100) + "%";
+                    document.getElementById("post_response").innerText = "Loading... " + ++post_progress + "/100";
                 });
             }
         });

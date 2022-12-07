@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <signal.h>
 #include "http_server.h"
 #include "common.h"
 #include "http_request.h"
@@ -63,6 +64,8 @@ static struct {
 	uint32_t buffer_out_len;
 	http_request_t request;
 	http_response_t response;
+	http_client_t *p_busy_client;
+	bool client_is_busy;
 } m_http_server_internal;
 
 static http_server_state_t http_server_state_off();
@@ -287,19 +290,19 @@ static http_server_state_t http_server_state_off() {
 		return HTTP_SERVER_STATE_OFF;
 	}
 
+	sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
+
 	log_debug("Server listening on http://%s:%d", m_http_server.ip_addr, m_http_server.port);
 
 	return HTTP_SERVER_STATE_IDLE;
 }
 
-static http_server_state_t http_server_state_idle() {
+static void http_server_drop_connection(http_client_t *p_client) {
+	// find client
 	for (uint32_t i = 0; i < m_http_server_internal.num_clients; i++) {
-		http_client_t *client = &m_http_server_internal.clients[i];
-
-		ret_code_t ret = http_server_handle_connection(client);
-		if (ret != RET_CODE_BUSY) {
-			log_debug("Dropping connection %d", client->socket_fd);
-			close(client->socket_fd);
+		if (m_http_server_internal.clients[i].socket_fd == p_client->socket_fd) {
+			log_debug("Dropping connection %d", p_client->socket_fd);
+			close(p_client->socket_fd);
 			// remove client
 			for (uint32_t j = i; j < m_http_server_internal.num_clients - 1; j++) {
 				memcpy(&m_http_server_internal.clients[j], &m_http_server_internal.clients[j + 1], sizeof(http_client_t));
@@ -307,6 +310,33 @@ static http_server_state_t http_server_state_idle() {
 			m_http_server_internal.num_clients--;
 			m_http_server_internal.buffer_in_len = 0;
 			m_http_server_internal.buffer_out_len = 0;
+			return;
+		}
+	}
+}
+
+static http_server_state_t http_server_state_idle() {
+	if (m_http_server_internal.client_is_busy) {
+		ret_code_t ret = http_server_handle_connection(m_http_server_internal.p_busy_client);
+
+		if (ret == RET_CODE_OK || ret == RET_CODE_ERROR) {
+			http_server_drop_connection(m_http_server_internal.p_busy_client);
+			m_http_server_internal.client_is_busy = false;
+		}
+	}
+
+	for (uint32_t i = 0; i < m_http_server_internal.num_clients && !m_http_server_internal.client_is_busy; i++) {
+		http_client_t *p_client = &m_http_server_internal.clients[i];
+
+		ret_code_t ret = http_server_handle_connection(p_client);
+
+		if (ret == RET_CODE_BUSY) {
+			m_http_server_internal.p_busy_client = p_client;
+			m_http_server_internal.client_is_busy = true;
+			break;
+		}
+		if (ret == RET_CODE_OK || ret == RET_CODE_ERROR) {
+			http_server_drop_connection(p_client);
 		}
 	}
 
@@ -405,7 +435,8 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 			return RET_CODE_OK;
 		} else if (bytes_received < 0) {
 			if (errno != EAGAIN && errno != EWOULDBLOCK) {
-				unrecoverable_error("Failed to receive data from client");
+				internal_error("Failed to receive data from client");
+				log_error("%s", strerror(errno));
 				return RET_CODE_ERROR;
 			}
 			// check timeout
@@ -414,7 +445,7 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 				return RET_CODE_OK;
 			}
 
-			return RET_CODE_BUSY;
+			return RET_CODE_READY;
 		}
 
 		p_client->activity_timestamp = http_server_get_timestamp();
@@ -452,10 +483,14 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 	m_http_server_internal.buffer_in_len -= bytes_consumed;
 	memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_consumed, m_http_server_internal.buffer_in_len);
 
+	if (ret == RET_CODE_BUSY) {
+		return RET_CODE_BUSY;
+	}
+
 	// send response
 	int32_t bytes_sent = (int32_t) send(p_client->socket_fd, p_buffer_out, m_http_server_internal.buffer_out_len, 0);
 	if (bytes_sent < 0) {
-		unrecoverable_error("Failed to send response to client");
+		internal_error("Failed to send response to client");
 		return RET_CODE_ERROR;
 	}
 
@@ -473,7 +508,7 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 
 	m_http_server_internal.buffer_in_len = 0;
 
-	return RET_CODE_BUSY;
+	return RET_CODE_READY;
 }
 
 static http_server_state_t http_server_state_stop() {

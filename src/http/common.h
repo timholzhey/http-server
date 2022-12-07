@@ -12,6 +12,7 @@ typedef enum {
 	RET_CODE_OK,
 	RET_CODE_BUSY,
 	RET_CODE_ERROR,
+	RET_CODE_READY,
 } ret_code_t;
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

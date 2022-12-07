@@ -5,6 +5,10 @@
 #include <netinet/in.h>
 #include "websocket_frame.h"
 
+#ifndef ntohll
+#define ntohll(x) be64toh(x)
+#endif
+
 ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, uint32_t *p_bytes_consumed) {
 	VERIFY_ARGS_NOT_NULL(p_data, p_frame);
 
@@ -44,7 +48,7 @@ ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_
 		}
 
 		uint64_t *p_len = (uint64_t *) (p_data + *p_bytes_consumed);
-		p_frame->payload_len = be64toh(*p_len);
+		p_frame->payload_len = ntohll(*p_len);
 		*p_bytes_consumed += 8;
 	} else {
 		p_frame->payload_len = p_frame->header.payload_len;
@@ -118,7 +122,7 @@ ret_code_t websocket_frame_encode(websocket_frame_t *p_frame, uint8_t *p_data_ou
 	} else {
 		p_data_out[bytes_consumed++] = 127;
 		uint64_t *p_len = (uint64_t *) (p_data_out + bytes_consumed);
-		*p_len = htobe64(p_frame->payload_len);
+		*p_len = htonll(p_frame->payload_len);
 		bytes_consumed += 8;
 	}
 
