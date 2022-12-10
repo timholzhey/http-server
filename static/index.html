@@ -2,75 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>HTTP Server</title>
 </head>
 <body>
-    <h1>Hello World</h1>
-    <div style="display: flex; flex-direction: column; width: 20em;">
-        <h2>Example routes</h2>
-        <a href="/nonexistent">Example 404 route</a>
-        <a href="/get_route?myparam=Hi">Example GET route</a>
-        <a href="/post_route">Example POST route</a>
-        <button id="post_button">Example POST request</button>
-        <button id="penetrate_button">Spam 100 POST requests</button>
-        <p id="post_response"></p>
-        <div style="height: 1em; width: 0; background-color: red;" id="post_progress"></div>
-        <h2>Example image:</h2>
-        <img src="troll.webp" alt="troll">
-        <a href="troll.webp">troll.webp</a>
-        <h2>Example Websocket:</h2>
-        <p id="websocket-log"></p>
-    </div>
-    <script>
-        document.getElementById("post_button").addEventListener("click", function() {
-            document.getElementById("post_response").innerText = "Loading...";
-            fetch("/post_route", {
-                method: "POST",
-                body: JSON.stringify({
-                    "myparam": "Hi"
-                })
-            }).then(response => response.text()).then(text => {
-                document.getElementById("post_response").innerText = text;
-            });
-        });
-        let post_progress = 0;
-        document.getElementById("penetrate_button").addEventListener("click", function() {
-            post_progress = 0;
-            for (let i = 0; i < 100; i++) {
-                fetch("/post_route", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        "myparam": "Hi"
-                    })
-                }).then(response => {
-                    document.getElementById("post_progress").style.width = (post_progress / 100 * 100) + "%";
-                    document.getElementById("post_response").innerText = "Loading... " + ++post_progress + "/100";
-                });
-            }
-        });
-        let socket = new WebSocket(`ws://${window.location.host}/ws_route`);
-
-        socket.onopen = function(e) {
-            document.getElementById("websocket-log").innerText += "Connected to websocket\n";
-            socket.send("Hello from the client!");
-            document.getElementById("websocket-log").innerText += "Sent [Hello from the client!]\n";
-        };
-
-        socket.onmessage = function(event) {
-            document.getElementById("websocket-log").innerText += "Received [" + event.data + "]\n";
-        };
-
-        socket.onclose = function(event) {
-            if (event.wasClean) {
-                document.getElementById("websocket-log").innerText += "Connection closed cleanly\n";
-            } else {
-                document.getElementById("websocket-log").innerText += "Connection died\n";
-            }
-        };
-
-        socket.onerror = function(error) {
-            document.getElementById("websocket-log").innerText += "Error: " + error.message + "\n";
-        };
-    </script>
+    <h1>Hello, world!</h1>
 </body>
 </html>

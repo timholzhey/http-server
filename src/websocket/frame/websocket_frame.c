@@ -8,6 +8,9 @@
 #ifndef ntohll
 #define ntohll(x) be64toh(x)
 #endif
+#ifndef htonll
+#define htonll(x) htobe64(x)
+#endif
 
 ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, uint32_t *p_bytes_consumed) {
 	VERIFY_ARGS_NOT_NULL(p_data, p_frame);
