@@ -11,7 +11,6 @@
 #include "http_response.h"
 
 typedef struct {
-	void (*response)(const char *response);
 	void (*route)(const char *path, void (*handler)(void));
 	void (*config)(const char *ip_addr, uint16_t port);
 	void (*run)(void);
@@ -20,6 +19,7 @@ typedef struct {
 	void (*hook)(void (*hook)(void));
 	void (*serve_static)(const char *path);
 	void (*websocket)(const char *path, void (*handler)(void));
+	void (*websocket_streaming)(const char *path, void (*handler)(void));
 } http_server_interface_t;
 
 typedef struct {

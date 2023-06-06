@@ -36,7 +36,7 @@ typedef enum {
 
 ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, uint32_t *p_bytes_consumed);
 
-ret_code_t websocket_frame_build(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame);
+ret_code_t websocket_frame_build(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, websocket_opcode_t opcode);
 
 ret_code_t websocket_frame_encode(websocket_frame_t *p_frame, uint8_t *p_data_out, uint32_t *p_data_out_len, uint32_t max_data_out_len);
 

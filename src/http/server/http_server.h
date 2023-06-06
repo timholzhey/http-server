@@ -41,10 +41,10 @@ void http_server_stop(void);
 void http_server_hook(void (*hook)(void));
 void http_server_serve_static(const char *path);
 void http_server_websocket(const char *path, void (*handler)(void));
+void http_server_websocket_streaming(const char *path, void (*handler)(void));
 
 #define HTTP_SERVER(name) \
 	static http_server_interface_t name = { \
-    	.response = http_server_response, \
 		.route = http_server_route, \
         .config = http_server_config, \
 		.run = http_server_run,     \
@@ -52,7 +52,8 @@ void http_server_websocket(const char *path, void (*handler)(void));
 		.stop = http_server_stop,   \
 		.hook = http_server_hook,   \
         .serve_static = http_server_serve_static, \
-        .websocket = http_server_websocket,     \
+        .websocket = http_server_websocket,       \
+		.websocket_streaming = http_server_websocket_streaming, \
 	};
 
 #define HTTP_ROUTE(name, body) \

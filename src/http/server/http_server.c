@@ -94,10 +94,6 @@ static void unrecoverable_error(const char *error_desc) {
 	log_error("Unrecoverable error: %s", m_http_server.error_desc);
 }
 
-void http_server_response(const char *response) {
-
-}
-
 void http_server_hook(void (*hook)(void)) {
 	if (m_http_server.num_hooks >= HTTP_SERVER_MAX_NUM_HOOKS) {
 		internal_error("Too many hooks");
@@ -165,7 +161,7 @@ void http_server_route(const char *path, void (*handler)(void)) {
 		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
 	}
 
-	m_http_server.routes[m_http_server.num_routes].handler = handler;
+	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
 	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_HTTP;
 	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
 	m_http_server.num_routes++;
@@ -189,9 +185,34 @@ void http_server_websocket(const char *path, void (*handler)(void)) {
 		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
 	}
 
-	m_http_server.routes[m_http_server.num_routes].handler = handler;
+	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
 	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
 	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
+	m_http_server.num_routes++;
+}
+
+void http_server_websocket_streaming(const char *path, void (*handler)(void)) {
+	if (m_http_server.num_routes >= HTTP_SERVER_MAX_NUM_ROUTES) {
+		internal_error("Too many routes");
+		return;
+	}
+
+	if (strlen(path) >= HTTP_SERVER_MAX_ROUTE_PATH_LENGTH) {
+		internal_error("Route path too long");
+		return;
+	}
+
+	if (path[0] != '/') {
+		m_http_server.routes[m_http_server.num_routes].path[0] = '/';
+		strncpy(&m_http_server.routes[m_http_server.num_routes].path[1], path, sizeof(m_http_server.routes[m_http_server.num_routes].path) - 1);
+	} else {
+		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
+	}
+
+	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
+	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
+	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
+	m_http_server.routes[m_http_server.num_routes].is_streaming = true;
 	m_http_server.num_routes++;
 }
 
@@ -292,7 +313,7 @@ static http_server_state_t http_server_state_off() {
 
 	sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL);
 
-	log_debug("Server listening on http://%s:%d", m_http_server.ip_addr, m_http_server.port);
+	log_info("Server listening on http://%s:%d", m_http_server.ip_addr, m_http_server.port);
 
 	return HTTP_SERVER_STATE_IDLE;
 }
@@ -380,6 +401,11 @@ static http_server_state_t http_server_state_idle() {
 
 static ret_code_t http_server_handle(http_client_t *p_client, uint8_t *p_data_in, uint32_t data_in_len, uint32_t *p_num_bytes_consumed,
 									 uint8_t **pp_data_out, uint32_t *p_data_out_len, uint32_t max_data_out_len, http_route_t *p_routes, uint32_t num_routes) {
+	if (data_in_len == 0) {
+		// TODO: HTTP Streaming
+		return RET_CODE_OK;
+	}
+
 	// parse request
 	ret_code_t ret = http_request_parse(p_data_in, data_in_len, &m_http_server_internal.request, p_num_bytes_consumed);
 	if (ret == RET_CODE_BUSY) {
@@ -444,15 +470,13 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 				log_debug("Client %d timed out", p_client->socket_fd);
 				return RET_CODE_OK;
 			}
+		} else {
+			p_client->activity_timestamp = http_server_get_timestamp();
 
-			return RET_CODE_READY;
+			m_http_server_internal.buffer_in_len += bytes_received;
+
+			log_debug("Received %d bytes on connection %d", bytes_received, p_client->socket_fd);
 		}
-
-		p_client->activity_timestamp = http_server_get_timestamp();
-
-		m_http_server_internal.buffer_in_len += bytes_received;
-
-		log_debug("Received %d bytes on connection %d", bytes_received, p_client->socket_fd);
 	}
 
 	ret_code_t ret;
@@ -479,25 +503,31 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 		bytes_consumed = m_http_server_internal.buffer_in_len;
 	}
 
-	// consume buffer
-	m_http_server_internal.buffer_in_len -= bytes_consumed;
-	memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_consumed, m_http_server_internal.buffer_in_len);
+	if (m_http_server_internal.buffer_in_len > 0) {
+		// consume buffer
+		m_http_server_internal.buffer_in_len -= bytes_consumed;
+		memmove(m_http_server_internal.buffer_in, m_http_server_internal.buffer_in + bytes_consumed, m_http_server_internal.buffer_in_len);
+	}
 
 	if (ret == RET_CODE_BUSY) {
 		return RET_CODE_BUSY;
 	}
 
-	// send response
-	int32_t bytes_sent = (int32_t) send(p_client->socket_fd, p_buffer_out, m_http_server_internal.buffer_out_len, 0);
-	if (bytes_sent < 0) {
-		internal_error("Failed to send response to client");
-		return RET_CODE_ERROR;
+	if (m_http_server_internal.buffer_out_len > 0) {
+		// send response
+		int32_t bytes_sent = (int32_t) send(p_client->socket_fd, p_buffer_out, m_http_server_internal.buffer_out_len, 0);
+		if (bytes_sent < 0) {
+			internal_error("Failed to send response to client");
+			return RET_CODE_ERROR;
+		}
+
+		log_debug("Sent %d bytes on connection %d", bytes_sent, p_client->socket_fd);
 	}
 
-	log_debug("Sent %d bytes on connection %d", bytes_sent, p_client->socket_fd);
-
-	// clear
+	// clear request
 	memset(&m_http_server_internal.request, 0, sizeof(m_http_server_internal.request));
+
+	// clear response
 	http_response_reset(&m_http_server_internal.response);
 	memset(&m_http_server_internal.response, 0, sizeof(m_http_server_internal.response));
 

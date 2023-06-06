@@ -17,4 +17,6 @@ ret_code_t websocket_route_assign(http_client_t *p_client, http_request_t *p_req
 
 ret_code_t websocket_route_forward(http_client_t *p_client, http_route_t *p_routes, uint32_t num_routes);
 
+ret_code_t websocket_route_forward_stream(http_client_t *p_client, http_route_t *p_routes, uint32_t num_routes);
+
 #endif //HTTP_SERVER_WEBSOCKET_ROUTE_H

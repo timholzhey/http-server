@@ -28,7 +28,7 @@ WEBSOCKET_ROUTE(ws_shell, {
 			}
 			char buffer[1024];
 			while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-				websocket.send(buffer);
+				websocket.text(buffer);
 			}
 			pclose(fp);
 			break;

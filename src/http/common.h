@@ -44,6 +44,7 @@ typedef enum {
 
 #endif
 
+#define log_info(...)			printf(__VA_ARGS__); printf("\n");
 #define log_debug(...)			log_internal(LOG_COLOR_WHITE, __VA_ARGS__)
 #define log_error(...)			log_internal(LOG_COLOR_RED, __VA_ARGS__)
 #define log_highlight(...)		log_internal(LOG_COLOR_BLUE, __VA_ARGS__)

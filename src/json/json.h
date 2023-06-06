@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define JSON_NUM_MEMBERS	10000
+#define JSON_MAX_NUM_MEMBERS	10000
 
 typedef enum {
 	JSON_RETVAL_OK,
@@ -50,7 +50,7 @@ typedef struct {
 } json_array_member_t;
 
 struct json_array_t {
-	json_array_member_t* values[JSON_NUM_MEMBERS];
+	json_array_member_t* values[JSON_MAX_NUM_MEMBERS];
 	size_t length;
 };
 
@@ -61,7 +61,7 @@ typedef struct {
 } json_object_member_t;
 
 struct json_object_t {
-	json_object_member_t* members[JSON_NUM_MEMBERS];
+	json_object_member_t* members[JSON_MAX_NUM_MEMBERS];
 	uint32_t num_members;
 	struct json_object_t* parent;
 };
@@ -83,5 +83,7 @@ json_ret_code_t json_object_free(json_object_t* p_object);
 
 char *json_stringify(const json_object_t* p_object);
 char *json_stringify_pretty(const json_object_t* p_object);
+
+json_ret_code_t json_value_from_float_array(json_value_t* p_value, const float *p_array, uint32_t array_length);
 
 #endif //JSON_PARSER_JSON_H

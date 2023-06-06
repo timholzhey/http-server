@@ -35,19 +35,25 @@ void websocket_interface_set_frame(websocket_frame_t *p_frame) {
 }
 
 void websocket_interface_reset() {
-	m_env.event = 0;
+	m_env.event = WEBSOCKET_EVENT_NONE;
 	m_env.p_data = NULL;
 	m_env.send_pending = false;
 }
 
-void websocket_send(const char *data) {
-	websocket_frame_build((uint8_t *) data, strlen(data), &m_env.frame);
+void websocket_text(const char *data) {
+	websocket_frame_build((uint8_t *) data, strlen(data), &m_env.frame, WEBSOCKET_OPCODE_TEXT);
+	m_env.send_pending = true;
+}
+
+void websocket_send(uint8_t *p_data, uint32_t len) {
+	websocket_frame_build(p_data, len, &m_env.frame, WEBSOCKET_OPCODE_BINARY);
 	m_env.send_pending = true;
 }
 
 void websocket_interface_init(websocket_interface_t *p_interface) {
 	p_interface->event = m_env.event;
 	p_interface->data = m_env.p_data;
+	p_interface->text = websocket_text;
 	p_interface->send = websocket_send;
 }
 

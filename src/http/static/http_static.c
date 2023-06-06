@@ -14,6 +14,11 @@
 
 #define HTTP_STATIC_MAX_PATH_SIZE			1024
 
+#ifndef HTTP_SERVER_ROOT_DIR
+#warning "HTTP_SERVER_ROOT_DIR not defined, using default"
+#define HTTP_SERVER_ROOT_DIR				"/var/www/"
+#endif
+
 static char http_static_path[HTTP_STATIC_MAX_PATH_SIZE];
 
 ret_code_t http_static_init(const char *path) {
@@ -22,7 +27,7 @@ ret_code_t http_static_init(const char *path) {
 		return RET_CODE_ERROR;
 	}
 
-	strcpy(http_static_path, SOURCE_DIR);
+	strcpy(http_static_path, HTTP_SERVER_ROOT_DIR);
 	if (http_static_path[path_length - 1] != '/') {
 		strcat(http_static_path, "/");
 	}

@@ -49,8 +49,28 @@ ret_code_t http_headers_get_value_string(http_header_t *p_headers, uint32_t num_
 	}
 
 	for (uint32_t i = 0; i < num_headers; i++) {
-		if (strncmp(p_headers[i].key, key, strlen(key)) == 0) {
+		if (strlen(p_headers[i].key) == strlen(key) && strncmp(p_headers[i].key, key, strlen(key)) == 0) {
 			strcpy(value, p_headers[i].value);
+			return RET_CODE_OK;
+		}
+	}
+
+	return RET_CODE_ERROR;
+}
+
+ret_code_t http_headers_contains_value_string(http_header_t *p_headers, uint32_t num_headers, const char *key, const char *value) {
+	VERIFY_ARGS_NOT_NULL(p_headers, (char *) key, value);
+
+	if (strlen(key) > HTTP_HEADER_MAX_KEY_SIZE) {
+		log_error("Invalid key");
+		return RET_CODE_ERROR;
+	}
+
+	for (uint32_t i = 0; i < num_headers; i++) {
+		if (strlen(p_headers[i].key) == strlen(key) &&
+			strncmp(p_headers[i].key, key, strlen(key)) == 0 &&
+			strlen(p_headers[i].value) == strlen(value) &&
+			strncmp(p_headers[i].value, value, strlen(value)) == 0) {
 			return RET_CODE_OK;
 		}
 	}

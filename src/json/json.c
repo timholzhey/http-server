@@ -96,7 +96,7 @@ json_ret_code_t json_object_add_value(json_object_t *p_object, const char* key, 
 		return JSON_RETVAL_INVALID_PARAM;
 	}
 
-	if (p_object->num_members >= JSON_NUM_MEMBERS) {
+	if (p_object->num_members >= JSON_MAX_NUM_MEMBERS) {
 		return JSON_RETVAL_FAIL;
 	}
 
@@ -144,4 +144,33 @@ char *json_stringify(const json_object_t* p_object) {
 
 char *json_stringify_pretty(const json_object_t* p_object) {
 	return json_object_stringify(p_object, true);
+}
+
+json_ret_code_t json_value_from_float_array(json_value_t* p_value, const float *p_array, uint32_t array_length) {
+	if (p_value == NULL || p_array == NULL) {
+		return JSON_RETVAL_INVALID_PARAM;
+	}
+
+	if (array_length > JSON_MAX_NUM_MEMBERS) {
+		return JSON_RETVAL_FAIL;
+	}
+
+	p_value->array = malloc(sizeof(json_array_t));
+	if (p_value->array == NULL) {
+		return JSON_RETVAL_FAIL;
+	}
+	p_value->array->length = array_length;
+
+	json_array_member_t *p_members = malloc(array_length * sizeof(json_array_member_t));
+	if (p_members == NULL) {
+		return JSON_RETVAL_FAIL;
+	}
+
+	for (uint32_t i = 0; i < array_length; i++) {
+		p_members[i].type = JSON_VALUE_TYPE_NUMBER;
+		p_members[i].value.number = p_array[i];
+		p_value->array->values[i] = &p_members[i];
+	}
+
+	return JSON_RETVAL_OK;
 }

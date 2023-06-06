@@ -88,14 +88,14 @@ ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_
 }
 
 // build a frame from the given data to send
-ret_code_t websocket_frame_build(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame) {
+ret_code_t websocket_frame_build(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, websocket_opcode_t opcode) {
 	VERIFY_ARGS_NOT_NULL(p_data, p_frame);
 
 	p_frame->header.fin = 1;
 	p_frame->header.rsv1 = 0;
 	p_frame->header.rsv2 = 0;
 	p_frame->header.rsv3 = 0;
-	p_frame->header.opcode = WEBSOCKET_OPCODE_TEXT;
+	p_frame->header.opcode = opcode;
 	p_frame->header.mask = 0;
 	p_frame->payload_len = data_len;
 	p_frame->p_payload = p_data;
