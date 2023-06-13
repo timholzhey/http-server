@@ -73,5 +73,5 @@ add_executable(http_server
 
 add_definitions(
     -DHTTP_SERVER_ROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-    -DDEBUG_GLOBAL=1
+#    -DDEBUG_GLOBAL=1
 )

@@ -27,7 +27,6 @@ ret_code_t http_route_forward(http_request_t *p_request, http_response_t *p_resp
 		if (strncmp(p_request->uri, p_routes[i].path, length) == 0 && strlen(p_routes[i].path) == length) {
 			p_routes[i].request_handler();
 			was_handled = true;
-			break;
 		}
 	}
 

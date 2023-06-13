@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <printf.h>
 #include "json.h"
 #include "json_lexer.h"
 #include "json_parser.h"
@@ -45,6 +46,20 @@ json_value_t* json_object_get_value(const json_object_t* p_object, const char* k
 	for (uint32_t i = 0; i < p_object->num_members; i++) {
 		if (strcmp(p_object->members[i]->key, key) == 0) {
 			return &p_object->members[i]->value;
+		}
+	}
+
+	return NULL;
+}
+
+json_object_member_t* json_object_get_member(const json_object_t* p_object, const char* key) {
+	if (p_object == NULL) {
+		return NULL;
+	}
+
+	for (uint32_t i = 0; i < p_object->num_members; i++) {
+		if (strcmp(p_object->members[i]->key, key) == 0) {
+			return p_object->members[i];
 		}
 	}
 
@@ -170,6 +185,43 @@ json_ret_code_t json_value_from_float_array(json_value_t* p_value, const float *
 		p_members[i].type = JSON_VALUE_TYPE_NUMBER;
 		p_members[i].value.number = p_array[i];
 		p_value->array->values[i] = &p_members[i];
+	}
+
+	return JSON_RETVAL_OK;
+}
+
+json_ret_code_t json_value_from_string_array(json_value_t* p_value, const char *p_array, uint32_t array_length) {
+	if (p_value == NULL || p_array == NULL) {
+		return JSON_RETVAL_INVALID_PARAM;
+	}
+
+	if (array_length > JSON_MAX_NUM_MEMBERS) {
+		return JSON_RETVAL_FAIL;
+	}
+
+	p_value->array = malloc(sizeof(json_array_t));
+	if (p_value->array == NULL) {
+		return JSON_RETVAL_FAIL;
+	}
+	p_value->array->length = array_length;
+
+	json_array_member_t *p_members = malloc(array_length * sizeof(json_array_member_t));
+	if (p_members == NULL) {
+		return JSON_RETVAL_FAIL;
+	}
+
+	const char *p_start = p_array;
+	// loop over all members, increase pointer by strlen + 1
+	for (uint32_t i = 0; i < array_length; i++) {
+		p_members[i].type = JSON_VALUE_TYPE_STRING;
+		p_members[i].value.string = malloc(strlen(p_start) + 1);
+		if (p_members[i].value.string == NULL) {
+			return JSON_RETVAL_FAIL;
+		}
+		strcpy(p_members[i].value.string, p_start);
+		p_value->array->values[i] = &p_members[i];
+
+		p_start += strlen(p_start) + 1;
 	}
 
 	return JSON_RETVAL_OK;

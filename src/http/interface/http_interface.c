@@ -18,6 +18,7 @@ void http_interface_environment_set(http_request_t *p_request, http_response_t *
 	m_env.p_request = p_request;
 	m_env.p_response = p_response;
 	m_env.num_allocations = 0;
+	m_env.p_response->status_code = HTTP_STATUS_CODE_OK;
 }
 
 void http_interface_environment_reset() {
@@ -40,7 +41,6 @@ static void http_response_text(const char *text) {
 	m_env.p_response->payload_length = len;
 	memcpy(m_env.p_response->payload, text, len);
 	m_env.p_response->payload_length = len;
-	m_env.p_response->status_code = HTTP_STATUS_CODE_OK;
 	http_headers_set_value_string(m_env.p_response->headers, &m_env.p_response->num_headers, "Content-Type", "text/plain");
 }
 

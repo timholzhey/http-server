@@ -337,6 +337,7 @@ static void http_server_drop_connection(http_client_t *p_client) {
 }
 
 static http_server_state_t http_server_state_idle() {
+	// TODO: Fix multiple connections
 	if (m_http_server_internal.client_is_busy) {
 		ret_code_t ret = http_server_handle_connection(m_http_server_internal.p_busy_client);
 
@@ -475,7 +476,7 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 
 			m_http_server_internal.buffer_in_len += bytes_received;
 
-			log_debug("Received %d bytes on connection %d", bytes_received, p_client->socket_fd);
+			log_debug("Received %d bytes from client %d", bytes_received, p_client->socket_fd);
 		}
 	}
 
@@ -521,7 +522,7 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 			return RET_CODE_ERROR;
 		}
 
-		log_debug("Sent %d bytes on connection %d", bytes_sent, p_client->socket_fd);
+		log_debug("Sent %d bytes to client %d", bytes_sent, p_client->socket_fd);
 	}
 
 	// clear request

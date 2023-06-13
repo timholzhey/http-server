@@ -240,6 +240,7 @@ json_ret_code_t json_parse_number(double *p_dest, const char* str_src, uint16_t 
 
 	// Valid finish states
 	if (state == JSON_PARSE_NUMBER_STATE_FINISH || state == JSON_PARSE_NUMBER_STATE_DIGIT ||
+		state == JSON_PARSE_NUMBER_STATE_ZERO ||
 		state == JSON_PARSE_NUMBER_STATE_DIGIT_NON_ZERO || state == JSON_PARSE_NUMBER_STATE_FRAC_DIGIT ||
 		state == JSON_PARSE_NUMBER_STATE_EXP_DIGIT) {
 		double integer_signed = integer * (sign ? -1.0 : 1.0f);

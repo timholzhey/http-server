@@ -73,6 +73,7 @@ struct json_object_t {
 json_ret_code_t json_parse(const char* p_data, size_t size, json_object_t* p_object);
 
 json_value_t* json_object_get_value(const json_object_t* p_object, const char* key);
+json_object_member_t* json_object_get_member(const json_object_t* p_object, const char* key);
 json_value_t* json_value_get_array_member(json_value_t* p_value, uint32_t index);
 json_value_type_t json_object_get_value_type(const json_object_t* p_object, const char* key);
 bool json_object_has_key(const json_object_t* p_object, const char* key);
@@ -85,5 +86,6 @@ char *json_stringify(const json_object_t* p_object);
 char *json_stringify_pretty(const json_object_t* p_object);
 
 json_ret_code_t json_value_from_float_array(json_value_t* p_value, const float *p_array, uint32_t array_length);
+json_ret_code_t json_value_from_string_array(json_value_t* p_value, const char *p_array, uint32_t array_length);
 
 #endif //JSON_PARSER_JSON_H
