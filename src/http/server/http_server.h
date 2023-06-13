@@ -30,6 +30,14 @@ typedef struct {
 	uint32_t activity_timestamp;
 	uint32_t keep_alive_timeout;
 	http_server_protocol_t protocol;
+	uint8_t buffer_in[HTTP_SERVER_BUFFER_IN_SIZE];
+	uint8_t buffer_out[HTTP_SERVER_STATIC_BUFFER_OUT_SIZE];
+	uint8_t *dynamic_buffer_out;
+	bool dynamic_buffer_out_allocated;
+	uint32_t buffer_in_len;
+	uint32_t buffer_out_len;
+	http_request_t request;
+	http_response_t response;
 } http_client_t;
 
 void http_server_response(const char *response);
