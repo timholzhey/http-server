@@ -8,13 +8,21 @@
 ret_code_t http_headers_set_value_string(http_header_t *p_headers, uint32_t *p_num_headers, const char *key, const char *value) {
 	VERIFY_ARGS_NOT_NULL(p_headers, p_num_headers, (char *) key, (char *) value);
 
-	if (strlen(key) > HTTP_HEADER_MAX_KEY_SIZE || strlen(value) > HTTP_HEADER_MAX_VALUE_SIZE) {
+	size_t key_length = strlen(key);
+	size_t value_length = strlen(value);
+
+	if (key_length > HTTP_HEADER_MAX_KEY_SIZE || value_length > HTTP_HEADER_MAX_VALUE_SIZE) {
 		log_error("Invalid key or value");
 		return RET_CODE_ERROR;
 	}
 
+	// Key already exists, change value
 	for (uint32_t i = 0; i < *p_num_headers; i++) {
-		if (strncmp(p_headers[i].key, key, strlen(key)) == 0) {
+		if (strncmp(p_headers[i].key, key, key_length) == 0) {
+			if ((p_headers[i].value = realloc(p_headers[i].value, value_length + 1)) == NULL) {
+				log_error("Could not allocate memory");
+				return RET_CODE_ERROR;
+			}
 			strcpy(p_headers[i].value, value);
 			return RET_CODE_OK;
 		}
@@ -25,8 +33,18 @@ ret_code_t http_headers_set_value_string(http_header_t *p_headers, uint32_t *p_n
 		return RET_CODE_ERROR;
 	}
 
+	if ((p_headers[*p_num_headers].key = malloc(key_length + 1)) == NULL) {
+		log_error("Could not allocate memory");
+		return RET_CODE_ERROR;
+	}
 	strcpy(p_headers[*p_num_headers].key, key);
+
+	if ((p_headers[*p_num_headers].value = malloc(value_length + 1)) == NULL) {
+		log_error("Could not allocate memory");
+		return RET_CODE_ERROR;
+	}
 	strcpy(p_headers[*p_num_headers].value, value);
+
 	(*p_num_headers)++;
 
 	return RET_CODE_OK;
@@ -37,6 +55,7 @@ ret_code_t http_headers_set_value_numeric(http_header_t *p_headers, uint32_t *p_
 
 	char num_buf[16];
 	snprintf(num_buf, sizeof(num_buf), "%d", value);
+
 	return http_headers_set_value_string(p_headers, p_num_headers, key, num_buf);
 }
 
@@ -58,7 +77,7 @@ ret_code_t http_headers_get_value_string(http_header_t *p_headers, uint32_t num_
 	return RET_CODE_ERROR;
 }
 
-ret_code_t http_headers_contains_value_string(http_header_t *p_headers, uint32_t num_headers, const char *key, const char *value) {
+ret_code_t http_headers_contains_key_value_string(http_header_t *p_headers, uint32_t num_headers, const char *key, const char *value) {
 	VERIFY_ARGS_NOT_NULL(p_headers, (char *) key, value);
 
 	if (strlen(key) > HTTP_HEADER_MAX_KEY_SIZE) {
@@ -88,4 +107,11 @@ ret_code_t http_headers_get_value_numeric(http_header_t *p_headers, uint32_t num
 	*value = strtol(buf, NULL, 10);
 
 	return RET_CODE_OK;
+}
+
+void http_headers_free(http_header_t *p_headers, uint32_t num_headers) {
+	for (uint32_t i = 0; i < num_headers; i++) {
+		free(p_headers[i].key);
+		free(p_headers[i].value);
+	}
 }

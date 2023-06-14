@@ -21,11 +21,12 @@ ret_code_t http_response_print(http_response_t *p_response) {
 }
 
 void http_response_reset(http_response_t *p_response) {
-	if (p_response == NULL || p_response->dynamic_payload == NULL) {
-		return;
-	}
+	http_headers_free(p_response->headers, p_response->num_headers);
+
 	if (p_response->dynamic_payload_allocated) {
 		free(p_response->dynamic_payload);
 		p_response->dynamic_payload_allocated = false;
 	}
+
+	memset(p_response, 0, sizeof(http_response_t));
 }

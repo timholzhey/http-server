@@ -28,4 +28,6 @@ typedef struct {
 
 ret_code_t http_request_print(http_request_t *p_request);
 
+void http_request_reset(http_request_t *p_request);
+
 #endif //HTTP_SERVER_HTTP_REQUEST_H

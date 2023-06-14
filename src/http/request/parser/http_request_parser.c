@@ -5,6 +5,7 @@
 #include "http_request_parser.h"
 #include "http_request.h"
 #include <stdbool.h>
+#include <stdlib.h>
 
 static ret_code_t read_line_crlf(const uint8_t *p_data, uint32_t data_len, uint32_t *p_line_len) {
 	for (uint32_t i = 0; i < data_len - 1; i++) {
@@ -124,7 +125,12 @@ ret_code_t http_request_parse(uint8_t *p_data, uint32_t data_len, http_request_t
 
 		READ_TOKEN_DELIM(':');
 
-		COPY_TOKEN(p_request->headers[p_request->num_headers].key, HTTP_HEADER_MAX_KEY_SIZE);
+		if ((p_request->headers[p_request->num_headers].key = malloc(token_length + 1)) == NULL) {
+			log_error("Could not allocate memory");
+			return RET_CODE_ERROR;
+		}
+
+		COPY_TOKEN(p_request->headers[p_request->num_headers].key, token_length + 1);
 
 		CONSUME_TOKEN();
 		READ_TOKEN_REST();
@@ -135,7 +141,12 @@ ret_code_t http_request_parse(uint8_t *p_data, uint32_t data_len, http_request_t
 			token_length--;
 		}
 
-		COPY_TOKEN(p_request->headers[p_request->num_headers].value, HTTP_HEADER_MAX_VALUE_SIZE);
+		if ((p_request->headers[p_request->num_headers].value = malloc(token_length + 1)) == NULL) {
+			log_error("Could not allocate memory");
+			return RET_CODE_ERROR;
+		}
+
+		COPY_TOKEN(p_request->headers[p_request->num_headers].value, token_length + 1);
 
 		CONSUME_TOKEN();
 		CONSUME_LINE();

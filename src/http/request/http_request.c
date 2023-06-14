@@ -20,3 +20,8 @@ ret_code_t http_request_print(http_request_t *p_request) {
 
 	return RET_CODE_OK;
 }
+
+void http_request_reset(http_request_t *p_request) {
+	http_headers_free(p_request->headers, p_request->num_headers);
+	memset(p_request, 0, sizeof(http_request_t));
+}

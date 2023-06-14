@@ -39,10 +39,10 @@ ret_code_t websocket_server_handle(http_client_t *p_client, uint8_t *p_data_in, 
 }
 
 bool websocket_server_is_upgrade(http_request_t *p_request) {
-	if (http_headers_contains_value_string(p_request->headers, p_request->num_headers, "Upgrade", "websocket") != RET_CODE_OK) {
+	if (http_headers_contains_key_value_string(p_request->headers, p_request->num_headers, "Upgrade", "websocket") != RET_CODE_OK) {
 		return false;
 	}
-	if (http_headers_contains_value_string(p_request->headers, p_request->num_headers, "Connection", "Upgrade") != RET_CODE_OK) {
+	if (http_headers_contains_key_value_string(p_request->headers, p_request->num_headers, "Connection", "Upgrade") != RET_CODE_OK) {
 		return false;
 	}
 	char sec_websocket_key[HTTP_HEADER_MAX_VALUE_SIZE];
@@ -50,7 +50,8 @@ bool websocket_server_is_upgrade(http_request_t *p_request) {
 		return false;
 	}
 	char sec_websocket_version[HTTP_HEADER_MAX_VALUE_SIZE];
-	if (http_headers_contains_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Version", "13") != RET_CODE_OK) {
+	if (http_headers_contains_key_value_string(p_request->headers, p_request->num_headers, "Sec-WebSocket-Version",
+											   "13") != RET_CODE_OK) {
 		return false;
 	}
 	return true;

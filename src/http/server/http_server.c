@@ -324,6 +324,22 @@ static void http_server_drop_connection(http_client_t *p_client) {
 	}
 }
 
+static void http_server_client_reset(http_client_t *p_client) {
+	// clear request
+	http_request_reset(&p_client->request);
+
+	// clear response
+	http_response_reset(&p_client->response);
+
+	// free dynamic buffer
+	if (p_client->dynamic_buffer_out_allocated) {
+		free(p_client->dynamic_buffer_out);
+		p_client->dynamic_buffer_out_allocated = false;
+	}
+
+	p_client->buffer_in_len = 0;
+}
+
 static http_server_state_t http_server_state_idle() {
 	for (uint32_t i = 0; i < m_http_server_internal.num_clients; i++) {
 		http_client_t *p_client = &m_http_server_internal.clients[i];
@@ -331,6 +347,7 @@ static http_server_state_t http_server_state_idle() {
 		ret_code_t ret = http_server_handle_connection(p_client);
 
 		if (ret == RET_CODE_OK || ret == RET_CODE_ERROR) {
+			http_server_client_reset(p_client);
 			http_server_drop_connection(p_client);
 		}
 	}
@@ -399,8 +416,12 @@ static ret_code_t http_server_handle(http_client_t *p_client, uint8_t *p_data_in
 
 	// handle request
 	bool is_websocket_upgrade = false;
-	http_request_handle(&p_client->request, &p_client->response,
-						p_routes, num_routes, &is_websocket_upgrade);
+	if (http_request_handle(&p_client->request, &p_client->response,
+						p_routes, num_routes, &is_websocket_upgrade) != RET_CODE_OK) {
+		log_error("Failed to handle HTTP request");
+		return RET_CODE_ERROR;
+	}
+
 	if (is_websocket_upgrade) {
 		p_client->protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
 		websocket_route_assign(p_client, &p_client->request, p_routes, num_routes);
@@ -503,12 +524,7 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 		log_debug("Sent %d bytes to client %d", bytes_sent, p_client->socket_fd);
 	}
 
-	// clear request
-	memset(&p_client->request, 0, sizeof(p_client->request));
-
-	// clear response
-	http_response_reset(&p_client->response);
-	memset(&p_client->response, 0, sizeof(p_client->response));
+	http_server_client_reset(p_client);
 
 	if (p_client->dynamic_buffer_out_allocated) {
 		free(p_client->dynamic_buffer_out);
@@ -516,6 +532,8 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 	}
 
 	p_client->buffer_in_len = 0;
+
+	http_server_client_reset(p_client);
 
 	return RET_CODE_READY;
 }
