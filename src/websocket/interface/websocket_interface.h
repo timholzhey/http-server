@@ -19,6 +19,7 @@ typedef enum {
 typedef struct {
 	websocket_event_t event;
 	uint8_t *data;
+	uint32_t data_length;
 	void (*text)(const char *data);
 	void (*send)(uint8_t *p_data, uint32_t len);
 	bool idle;

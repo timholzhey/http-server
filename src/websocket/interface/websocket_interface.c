@@ -9,6 +9,7 @@
 static struct {
 	websocket_event_t event;
 	uint8_t *p_data;
+	uint32_t data_length;
 	websocket_frame_t frame;
 	bool send_pending;
 	bool idle;
@@ -38,6 +39,7 @@ void websocket_interface_set_frame(websocket_frame_t *p_frame) {
 	}
 	memcpy(m_env.p_data, p_frame->p_payload, p_frame->payload_len + 1);
 	m_env.p_data[p_frame->payload_len] = '\0';
+	m_env.data_length = p_frame->payload_len;
 
 	// check disconnected
 	if (p_frame->header.opcode == WEBSOCKET_OPCODE_CLOSE) {
@@ -87,6 +89,7 @@ void websocket_send(uint8_t *p_data, uint32_t len) {
 void websocket_interface_init(websocket_interface_t *p_interface) {
 	p_interface->event = m_env.event;
 	p_interface->data = m_env.p_data;
+	p_interface->data_length = m_env.data_length;
 	p_interface->text = websocket_text;
 	p_interface->send = websocket_send;
 	p_interface->idle = m_env.idle;
