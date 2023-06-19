@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>Example: REST API</title>
+</head>
+<body>
+    <button id="button">Fetch weather</button>
+    <input id="city" value="Berlin">
+    <p id="weather"></p>
+</body>
+<script>
+    const button = document.getElementById('button');
+    const weather = document.getElementById('weather');
+    const city = document.getElementById('city');
+
+    button.addEventListener('click', () => {
+        fetch('/weather', {
+            method: "POST",
+            body: JSON.stringify({city: city.value})
+        })
+            .then(response => response.text())
+            .then(text => weather.innerText = text)
+    });
+</script>
+</html>

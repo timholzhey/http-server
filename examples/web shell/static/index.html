@@ -1,12 +1,15 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Web Shell</title>
+    <meta charset="UTF-8">
+    <title>Example: Web shell</title>
 </head>
 <body>
 <div id="shell">
     <div id="command-line">
         <p id="uname">root</p>:<p id="path">~</p>$&nbsp;
-        <input type="text" id="input" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="input" autofocus autocomplete="off" autocorrect="off" autocapitalize="off"
+               spellcheck="false">
     </div>
 </div>
 
@@ -64,7 +67,7 @@
     const commandLine = document.getElementById('command-line');
 
     const ws = new WebSocket(`ws://${window.location.host}/ws_shell`);
-    ws.onmessage = function(event) {
+    ws.onmessage = function (event) {
         const line = document.createElement('div');
         line.innerText = event.data;
         line.classList.add('result-line');
