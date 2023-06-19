@@ -109,6 +109,29 @@ ret_code_t http_headers_get_value_numeric(http_header_t *p_headers, uint32_t num
 	return RET_CODE_OK;
 }
 
+ret_code_t http_headers_unset(http_header_t *p_headers, uint32_t *p_num_headers, const char *key) {
+	VERIFY_ARGS_NOT_NULL(p_headers, p_num_headers, key);
+
+	if (strlen(key) > HTTP_HEADER_MAX_KEY_SIZE) {
+		log_error("Invalid key");
+		return RET_CODE_ERROR;
+	}
+
+	for (uint32_t i = 0; i < *p_num_headers; i++) {
+		if (strlen(p_headers[i].key) == strlen(key) && strncmp(p_headers[i].key, key, strlen(key)) == 0) {
+			free(p_headers[i].key);
+			free(p_headers[i].value);
+			for (uint32_t j = i; j < *p_num_headers - 1; j++) {
+				p_headers[j] = p_headers[j + 1];
+			}
+			(*p_num_headers)--;
+			return RET_CODE_OK;
+		}
+	}
+
+	return RET_CODE_OK;
+}
+
 void http_headers_free(http_header_t *p_headers, uint32_t num_headers) {
 	for (uint32_t i = 0; i < num_headers; i++) {
 		free(p_headers[i].key);

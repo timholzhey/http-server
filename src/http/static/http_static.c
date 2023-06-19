@@ -117,6 +117,8 @@ ret_code_t http_static_route(http_request_t *p_request, http_response_t *p_respo
 
 	p_response->status_code = HTTP_STATUS_CODE_OK;
 
+	http_headers_set_value_numeric(p_response->headers, &p_response->num_headers, "Content-Length", p_response->payload_length);
+
 	fclose(file);
 
 	return RET_CODE_OK;

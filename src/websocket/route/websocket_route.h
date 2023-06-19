@@ -10,6 +10,7 @@
 #include "http_request.h"
 #include "http_route.h"
 #include "websocket_frame.h"
+#include "http_server_client.h"
 
 bool websocket_route_exists(http_request_t *p_request, http_route_t *p_routes, uint32_t num_routes);
 

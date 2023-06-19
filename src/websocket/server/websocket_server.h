@@ -8,6 +8,7 @@
 #include "common.h"
 #include <stdint.h>
 #include "http_route.h"
+#include "http_server_client.h"
 
 ret_code_t websocket_server_handle(http_client_t *p_client, uint8_t *p_data_in, uint32_t data_in_len,
 								   uint32_t *p_num_bytes_consumed,

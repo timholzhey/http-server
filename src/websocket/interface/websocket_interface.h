@@ -10,7 +10,7 @@
 #include "websocket_frame.h"
 
 typedef enum {
-	WEBSOCKET_EVENT_NONE,
+	WEBSOCKET_EVENT_IDLE,
 	WEBSOCKET_EVENT_CONNECTED,
 	WEBSOCKET_EVENT_DISCONNECTED,
 	WEBSOCKET_EVENT_DATA,
@@ -21,11 +21,14 @@ typedef struct {
 	uint8_t *data;
 	void (*text)(const char *data);
 	void (*send)(uint8_t *p_data, uint32_t len);
+	bool idle;
 } websocket_interface_t;
 
-void websocket_interface_set(websocket_event_t event);
+extern websocket_interface_t websocket;
+
+void websocket_interface_environment_set(websocket_event_t event);
 void websocket_interface_set_frame(websocket_frame_t *p_frame);
-void websocket_interface_reset();
+void websocket_interface_environment_reset(void);
 
 void websocket_interface_init(websocket_interface_t *p_interface);
 

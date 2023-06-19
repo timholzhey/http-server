@@ -27,6 +27,8 @@ ret_code_t http_headers_get_value_numeric(http_header_t *p_headers, uint32_t num
 
 ret_code_t http_headers_contains_key_value_string(http_header_t *p_headers, uint32_t num_headers, const char *key, const char *value);
 
+ret_code_t http_headers_unset(http_header_t *p_headers, uint32_t *p_num_headers, const char *key);
+
 void http_headers_free(http_header_t *p_headers, uint32_t num_headers);
 
 #endif //HTTP_SERVER_HTTP_HEADERS_H

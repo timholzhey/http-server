@@ -24,6 +24,7 @@
 #include "http_static.h"
 #include "websocket_server.h"
 #include "websocket_route.h"
+#include "http_server_client.h"
 
 #define HTTP_SERVER_MAX_ERROR_DESC_LENGTH		100
 #define HTTP_SERVER_IP_ADDRESS_LENGTH			16
@@ -100,6 +101,7 @@ void http_server_serve_static(const char *path) {
 	}
 
 	m_http_server.serve_static = true;
+	log_debug("Static file server initialized");
 }
 
 void http_server_start(void) {
@@ -133,77 +135,32 @@ void http_server_stop(void) {
 	}
 }
 
-void http_server_route(const char *path, void (*handler)(void)) {
+void http_server_route(http_route_t route) {
 	if (m_http_server.num_routes >= HTTP_SERVER_MAX_NUM_ROUTES) {
 		internal_error("Too many routes");
 		return;
 	}
 
-	if (strlen(path) >= HTTP_SERVER_MAX_ROUTE_PATH_LENGTH) {
-		internal_error("Route path too long");
-		return;
-	}
+	memcpy(&m_http_server.routes[m_http_server.num_routes], &route, sizeof(http_route_t));
 
-	if (path[0] != '/') {
+	if (route.path[0] != '/') {
+		m_http_server.routes[m_http_server.num_routes].path = malloc(strlen(route.path) + 2);
 		m_http_server.routes[m_http_server.num_routes].path[0] = '/';
-		strncpy(&m_http_server.routes[m_http_server.num_routes].path[1], path, sizeof(m_http_server.routes[m_http_server.num_routes].path) - 1);
+		strcpy(&m_http_server.routes[m_http_server.num_routes].path[1], route.path);
 	} else {
-		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
+		m_http_server.routes[m_http_server.num_routes].path = malloc(strlen(route.path) + 1);
+		strcpy(m_http_server.routes[m_http_server.num_routes].path, route.path);
 	}
-
-	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
-	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_HTTP;
 	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
+	log_debug("Route %s registered", m_http_server.routes[m_http_server.num_routes].path);
+
 	m_http_server.num_routes++;
 }
 
-void http_server_websocket(const char *path, void (*handler)(void)) {
-	if (m_http_server.num_routes >= HTTP_SERVER_MAX_NUM_ROUTES) {
-		internal_error("Too many routes");
-		return;
+void http_server_routes(http_route_t *routes, uint32_t num_routes) {
+	for (uint32_t i = 0; i < num_routes; i++) {
+		http_server_route(routes[i]);
 	}
-
-	if (strlen(path) >= HTTP_SERVER_MAX_ROUTE_PATH_LENGTH) {
-		internal_error("Route path too long");
-		return;
-	}
-
-	if (path[0] != '/') {
-		m_http_server.routes[m_http_server.num_routes].path[0] = '/';
-		strncpy(&m_http_server.routes[m_http_server.num_routes].path[1], path, sizeof(m_http_server.routes[m_http_server.num_routes].path) - 1);
-	} else {
-		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
-	}
-
-	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
-	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
-	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
-	m_http_server.num_routes++;
-}
-
-void http_server_websocket_streaming(const char *path, void (*handler)(void)) {
-	if (m_http_server.num_routes >= HTTP_SERVER_MAX_NUM_ROUTES) {
-		internal_error("Too many routes");
-		return;
-	}
-
-	if (strlen(path) >= HTTP_SERVER_MAX_ROUTE_PATH_LENGTH) {
-		internal_error("Route path too long");
-		return;
-	}
-
-	if (path[0] != '/') {
-		m_http_server.routes[m_http_server.num_routes].path[0] = '/';
-		strncpy(&m_http_server.routes[m_http_server.num_routes].path[1], path, sizeof(m_http_server.routes[m_http_server.num_routes].path) - 1);
-	} else {
-		strncpy(m_http_server.routes[m_http_server.num_routes].path, path, sizeof(m_http_server.routes[m_http_server.num_routes].path));
-	}
-
-	m_http_server.routes[m_http_server.num_routes].request_handler = handler;
-	m_http_server.routes[m_http_server.num_routes].protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
-	m_http_server.routes[m_http_server.num_routes].id = INT32_MAX;
-	m_http_server.routes[m_http_server.num_routes].is_streaming = true;
-	m_http_server.num_routes++;
 }
 
 static void http_server_process() {
@@ -314,6 +271,8 @@ static void http_server_drop_connection(http_client_t *p_client) {
 		if (m_http_server_internal.clients[i].socket_fd == p_client->socket_fd) {
 			log_debug("Dropping connection %d", p_client->socket_fd);
 			close(p_client->socket_fd);
+			memset(p_client, 0, sizeof(http_client_t));
+
 			// remove client
 			for (uint32_t j = i; j < m_http_server_internal.num_clients - 1; j++) {
 				memcpy(&m_http_server_internal.clients[j], &m_http_server_internal.clients[j + 1], sizeof(http_client_t));
@@ -397,35 +356,41 @@ static http_server_state_t http_server_state_idle() {
 
 static ret_code_t http_server_handle(http_client_t *p_client, uint8_t *p_data_in, uint32_t data_in_len, uint32_t *p_num_bytes_consumed,
 									 uint8_t **pp_data_out, uint32_t *p_data_out_len, uint32_t max_data_out_len, http_route_t *p_routes, uint32_t num_routes) {
+	bool is_websocket_upgrade = false, is_headless = false;
 	if (data_in_len == 0) {
-		// TODO: HTTP Streaming
-		return RET_CODE_OK;
+		if (http_route_forward_stream(p_client, p_routes, num_routes) != RET_CODE_OK) {
+			return RET_CODE_OK;
+		}
+		is_headless = true;
+	} else {
+		// parse request
+		ret_code_t ret = http_request_parse(p_data_in, data_in_len, &p_client->request, p_num_bytes_consumed);
+		if (ret == RET_CODE_BUSY) {
+			return RET_CODE_BUSY;
+		}
+		if (ret != RET_CODE_OK) {
+			internal_error("Failed to parse HTTP request");
+			return RET_CODE_ERROR;
+		}
+
+		log_debug("Request: ");
+		http_request_print(&p_client->request);
+
+		// handle request
+		if (http_request_handle(p_client, p_routes, num_routes, &is_websocket_upgrade) != RET_CODE_OK) {
+			log_error("Failed to handle HTTP request");
+			return RET_CODE_ERROR;
+		}
 	}
 
-	// parse request
-	ret_code_t ret = http_request_parse(p_data_in, data_in_len, &p_client->request, p_num_bytes_consumed);
-	if (ret == RET_CODE_BUSY) {
-		return RET_CODE_BUSY;
-	}
-	if (ret != RET_CODE_OK) {
-		internal_error("Failed to parse HTTP request");
-		return RET_CODE_ERROR;
-	}
-
-	http_request_print(&p_client->request);
-
-	// handle request
-	bool is_websocket_upgrade = false;
-	if (http_request_handle(&p_client->request, &p_client->response,
-						p_routes, num_routes, &is_websocket_upgrade) != RET_CODE_OK) {
-		log_error("Failed to handle HTTP request");
-		return RET_CODE_ERROR;
-	}
+	log_debug("Response: ");
+	http_response_print(&p_client->response);
 
 	if (is_websocket_upgrade) {
 		p_client->protocol = HTTP_SERVER_PROTOCOL_WEBSOCKET;
 		websocket_route_assign(p_client, &p_client->request, p_routes, num_routes);
 		websocket_route_forward(p_client, p_routes, num_routes);
+		websocket_interface_environment_reset();
 	}
 
 	if (p_client->response.payload_length > HTTP_SERVER_STATIC_BUFFER_OUT_SIZE) {
@@ -444,7 +409,7 @@ static ret_code_t http_server_handle(http_client_t *p_client, uint8_t *p_data_in
 	}
 
 	// build response
-	if (http_response_build(&p_client->response, *pp_data_out, p_data_out_len, max_data_out_len) != RET_CODE_OK) {
+	if (http_response_build(&p_client->response, *pp_data_out, p_data_out_len, max_data_out_len, is_headless) != RET_CODE_OK) {
 		internal_error("Failed to build HTTP response");
 		return RET_CODE_ERROR;
 	}
@@ -522,16 +487,8 @@ static ret_code_t http_server_handle_connection(http_client_t *p_client) {
 		}
 
 		log_debug("Sent %d bytes to client %d", bytes_sent, p_client->socket_fd);
+		p_client->activity_timestamp = http_server_get_timestamp();
 	}
-
-	http_server_client_reset(p_client);
-
-	if (p_client->dynamic_buffer_out_allocated) {
-		free(p_client->dynamic_buffer_out);
-		p_client->dynamic_buffer_out_allocated = false;
-	}
-
-	p_client->buffer_in_len = 0;
 
 	http_server_client_reset(p_client);
 

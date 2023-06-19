@@ -87,7 +87,6 @@ ret_code_t websocket_frame_decode(uint8_t *p_data, uint32_t data_len, websocket_
 	return RET_CODE_OK;
 }
 
-// build a frame from the given data to send
 ret_code_t websocket_frame_build(uint8_t *p_data, uint32_t data_len, websocket_frame_t *p_frame, websocket_opcode_t opcode) {
 	VERIFY_ARGS_NOT_NULL(p_data, p_frame);
 

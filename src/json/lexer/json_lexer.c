@@ -285,7 +285,6 @@ JSON_IS_TOKEN_TYPE_FN_IMPL(JSON_TOKEN_TYPE_VAL_BOOLEAN) {
 }
 
 JSON_IS_TOKEN_TYPE_FN_IMPL(JSON_TOKEN_TYPE_VAL_STRING) {
-	bool match = true;
 	JSON_RETURN_COND_FALSE(JSON_MATCH_CHAR(*JSON_TOKEN_STR_REPR_VAL_STRING_QUOTES));
 
 	bool do_escape = false;
@@ -329,14 +328,15 @@ JSON_IS_TOKEN_TYPE_FN_IMPL(JSON_TOKEN_TYPE_VAL_STRING) {
 			JSON_RETURN_BOOL(false);
 		}
 	}
-	if (m_json_lex.buffer_len >= 2 && m_json_lex.buffer[m_json_lex.buffer_len] == *JSON_TOKEN_STR_REPR_VAL_STRING_QUOTES) {
+
+	if (m_json_lex.buffer_len >= 1 && m_json_lex.buffer[m_json_lex.buffer_len] == *JSON_TOKEN_STR_REPR_VAL_STRING_QUOTES) {
 		m_json_lex.token.value.string.data = calloc(m_json_lex.buffer_len, sizeof(char));
 		json_str_unescape(m_json_lex.token.value.string.data, m_json_lex.buffer + 1, m_json_lex.buffer_len - 1);
 		m_json_lex.token.value.string.length = m_json_lex.buffer_len - 1;
-	} else {
-		return JSON_RETVAL_INCOMPLETE;
+		JSON_RETURN_BOOL(true);
 	}
-	JSON_RETURN_BOOL(match);
+
+	return JSON_RETVAL_INCOMPLETE;
 }
 
 JSON_IS_TOKEN_TYPE_FN_IMPL(JSON_TOKEN_TYPE_VAL_NUMBER) {
