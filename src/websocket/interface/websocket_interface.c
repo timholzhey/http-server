@@ -47,6 +47,10 @@ void websocket_interface_set_frame(websocket_frame_t *p_frame) {
 	} else {
 		m_env.event = WEBSOCKET_EVENT_DATA;
 	}
+
+	if (!m_env.interface_initialized) {
+		websocket_interface_environment_set(m_env.event);
+	}
 }
 
 void websocket_interface_environment_reset(void) {

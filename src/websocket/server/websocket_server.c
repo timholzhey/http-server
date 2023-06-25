@@ -21,7 +21,6 @@ ret_code_t websocket_server_handle(http_client_t *p_client, uint8_t *p_data_in, 
 		RET_ON_FAIL(websocket_frame_decode(p_data_in, data_in_len, &m_frame, p_num_bytes_consumed));
 
 		websocket_interface_set_frame(&m_frame);
-		websocket_interface_environment_set(WEBSOCKET_EVENT_DATA);
 
 		websocket_route_forward(p_client, p_routes, num_routes);
 	} else {
